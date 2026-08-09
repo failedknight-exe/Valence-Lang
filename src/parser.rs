@@ -11,6 +11,7 @@ pub enum Node {
     VarGDecl { name: String, value: Box<Node> },
     ConstDecl { name: String, value: Box<Node> },
     UpdateDecl { name: String, value: Box<Node> },
+    MultiVarL { names: Vec<String>, values: Vec<Box<Node>> },
     UpdateIndex { name: String, index: Box<Node>, value: Box<Node> },
     Summon(String),
     Print(Box<Node>),
@@ -289,9 +290,9 @@ impl Parser {
             println!("[PARSE ERROR] Multi-assign mismatch.");
             return None;
         }
-        Some(Node::VarLDecl {
-            name: names[0].clone(),
-            value: Box::new(values[0].clone()),
+        Some(Node::MultiVarL {
+            names,
+            values: values.into_iter().map(|v| Box::new(v)).collect(),
         })
     }
 

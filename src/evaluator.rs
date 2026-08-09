@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::{self, Write};
 
 /// Runtime values supported by the language.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Integer(i64),
     Float(f64),
@@ -13,6 +13,25 @@ pub enum Value {
     Boolean(bool),
     Array(Vec<Value>),
     Null,
+    Return(Box<Value>),
+    Break,
+    Continue,
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::Integer(a), Value::Integer(b)) => a == b,
+            (Value::Float(a), Value::Float(b)) => a == b,
+            (Value::StringVal(a), Value::StringVal(b)) => a == b,
+            (Value::Boolean(a), Value::Boolean(b)) => a == b,
+            (Value::Array(a), Value::Array(b)) => a == b,
+            (Value::Null, Value::Null) => true,
+            (Value::Break, Value::Break) => true,
+            (Value::Continue, Value::Continue) => true,
+            _ => false,
+        }
+    }
 }
 
 impl std::fmt::Display for Value {
@@ -26,7 +45,11 @@ impl std::fmt::Display for Value {
             Value::Array(arr) => {
                 let items: Vec<String> = arr.iter().map(|v| format!("{}", v)).collect();
                 write!(f, "[{}]", items.join(", "))
+                
             }
+            Value::Return(v) => write!(f, "{}", v),
+            Value::Break => write!(f, ""),
+            Value::Continue => write!(f, ""),
         }
     }
 }
@@ -179,6 +202,9 @@ impl Evaluator {
                     Value::Boolean(_) => "boolean",
                     Value::Array(_) => "array",
                     Value::Null => "null",
+                    Value::Return(_) => "return",
+                    Value::Break => "break",
+                    Value::Continue => "continue",
                 };
                 Value::StringVal(type_name.to_string())
             }
@@ -536,21 +562,42 @@ impl Evaluator {
                 }
             }
 
-            Node::Check { condition, body, or_checks, else_body } => {
+            Node::Check { condition, body, or_checks, else_body} => {
                 let cond = self.eval(*condition);
                 if let Value::Boolean(true) = cond {
-                    for node in body { self.eval(node); }
+                    for node in body {
+                        let result = self.eval(node);
+                        if let Value::Return(_) = result {
+                            return result;
+                        }
+                        if let Value::Break = result { return result; }
+                        if let Value::Continue = result { return result; }
+                    }
                     return Value::Null;
                 }
-                for (or_cond, or_body) in or_checks {
+                for (or_cond, or_body) in or_checks{
                     let result = self.eval(or_cond);
                     if let Value::Boolean(true) = result {
-                        for node in or_body { self.eval(node); }
+                        for node in or_body {
+                            let result = self.eval(node);
+                            if let Value::Return(_) = result {
+                                return result;
+                            }
+                            if let Value::Break = result { return result; }
+                            if let Value::Continue = result { return result; }
+                        }
                         return Value::Null;
                     }
                 }
                 if let Some(else_nodes) = else_body {
-                    for node in else_nodes { self.eval(node); }
+                    for node in else_nodes {
+                        let result = self.eval(node);
+                        if let Value::Return(_) = result {
+                            return result;
+                        }
+                        if let Value::Break = result { return result; }
+                        if let Value::Continue = result { return result; }
+                    }
                 }
                 Value::Null
             }
@@ -561,20 +608,23 @@ impl Evaluator {
                 for i in 0..times {
                     self.local_vars.insert(name.clone(), Value::Integer(i));
                     let mut should_shatter = false;
+                    let mut should_skip = false;
                     for node in body.clone() {
-                        match node {
-                            Node::Shatter => { should_shatter = true; break; }
-                            Node::Skip => break,
-                            _ => { self.eval(node); }
+                        let result = self.eval(node);
+                        match result {
+                            Value::Return(_) => return result,
+                            Value::Break => { should_shatter = true; break; },
+                            Value::Continue => { should_skip = true; break; },
+                            _ => {}
                         }
                     }
-                    if should_shatter { break; }
+                    if should_shatter { break;}
                 }
                 Value::Null
             }
 
-            Node::Shatter => Value::Null,
-            Node::Skip => Value::Null,
+            Node::Shatter => Value::Break,
+            Node::Skip => Value::Continue,
 
             Node::FuncDecl { name, func_type, params, body } => {
                 self.functions.insert(name, StoredFunc { func_type, params, body });
@@ -609,11 +659,12 @@ impl Evaluator {
                     self.local_vars.insert(param.clone(), val);
                 }
 
-                let mut result = Value::Null;
+                let mut result =Value::Null;
                 for node in func.body {
-                    match node {
-                        Node::Reply(expr) => { result = self.eval(*expr); break; }
-                        _ => { result = self.eval(node); }
+                    result = self.eval(node);
+                    if let Value::Return(val) = result {
+                        result = *val;
+                        break;
                     }
                 }
                 self.local_vars = saved_locals;
@@ -651,7 +702,18 @@ impl Evaluator {
                 Value::Null
             }
 
-            Node::Reply(expr) => self.eval(*expr),
+                        Node::MultiVarL { names, values } => {
+                for (i, name) in names.iter().enumerate() {
+                    let val = self.eval(*values[i].clone());
+                    self.local_vars.insert(name.clone(), val);
+                }
+                Value::Null
+            }
+
+            Node::Reply(expr) => {
+                let val = self.eval(*expr);
+                Value::Return(Box::new(val))
+            }
         }
     }
 
