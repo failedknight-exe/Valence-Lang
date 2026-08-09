@@ -1,0 +1,29 @@
+# Rust build output
+/target
+
+# Debug symbols
+*.pdb
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Connect test files
+*.dim
+savegame.dim
+test.txt
+test_output.txt
+test_module.cor
+generated.cor
+dynamic.cor
+demo.txt
+helper.cor
+utils.cor

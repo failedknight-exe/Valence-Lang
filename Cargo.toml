@@ -1,0 +1,15 @@
+[package]
+name = "connect"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "cor"
+path = "src/cor_main.rs"
+
+[[bin]]
+name = "crh"
+path = "src/crh_main.rs"
+
+[dependencies]
+chrono = "0.4"
