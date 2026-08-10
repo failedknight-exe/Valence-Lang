@@ -14,6 +14,7 @@ pub enum Node {
     MultiVarL { names: Vec<String>, values: Vec<Box<Node>> },
     UpdateIndex { name: String, index: Box<Node>, value: Box<Node> },
     Summon(String),
+    VarAccess(String),
     Print(Box<Node>),
     InputExpr(Box<Node>),
     TypeOf(Box<Node>),
@@ -161,6 +162,17 @@ impl Parser {
             Token::Use     => self.parse_use(),
             Token::Shatter => { self.advance(); Some(Node::Shatter) }
             Token::Skip    => { self.advance(); Some(Node::Skip) }
+            Token::Summon => {
+                self.advance();
+                let name = match self.advance().clone() {
+                    Token::Ident(n) => n,
+                    _ => {
+                        println!("[PARSE ERROR] Expected identifier after 'summon'.");
+                        return None;
+                    }
+                };
+                Some(Node::Summon(name))
+            }
             Token::Ident(_) => {
                 match self.peek_ahead() {
                     Token::LParen => self.parse_func_call_statement(),
@@ -888,7 +900,7 @@ impl Parser {
                     Some(Node::MethodCall { object: name, method, args })
                 }
                 else {
-                    Some(Node::Summon(name))
+                    Some(Node::VarAccess(name))
                 }
             }
 

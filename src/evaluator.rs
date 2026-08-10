@@ -83,6 +83,7 @@ pub struct Evaluator {
     constants: HashMap<String, Value>,
     functions: HashMap<String, StoredFunc>,
     onetime_used: HashSet<String>,
+    parent_locals: Vec<HashMap<String, Value>>,
 }
 
 impl Evaluator {
@@ -94,6 +95,7 @@ impl Evaluator {
             constants: HashMap::new(),
             functions: HashMap::new(),
             onetime_used: HashSet::new(),
+            parent_locals: Vec::new(),
         }
     }
 
@@ -168,7 +170,7 @@ impl Evaluator {
                 val
             }
 
-            Node::Summon(name) => {
+            Node::VarAccess(name) => {
                 if let Some(val) = self.local_vars.get(&name) {
                     return val.clone();
                 }
@@ -181,6 +183,26 @@ impl Evaluator {
                 println!("[RUNTIME ERROR] '{}' was never declared.", name);
                 Value::Null
             }
+
+            Node::Summon(name) => {
+    if let Some(val) = self.local_vars.get(&name) {
+        return val.clone();
+    }
+    for (i, parent) in self.parent_locals.iter().rev().enumerate() {
+        if let Some(val) = parent.get(&name) {
+            self.local_vars.insert(name.clone(), val.clone());
+            return val.clone();
+        }
+    }
+    if let Some(val) = self.global_vars.get(&name) {
+        return val.clone();
+    }
+    if let Some(val) = self.constants.get(&name) {
+        return val.clone();
+    }
+    println!("[RUNTIME ERROR] '{}' was never declared.", name);
+    Value::Null
+}
 
             Node::Print(expr) => {
                 let val = self.eval(*expr);
@@ -719,8 +741,9 @@ impl Evaluator {
                 let mut evaluated_args = Vec::new();
                 for arg in args { evaluated_args.push(self.eval(arg)); }
 
-                let saved_locals = self.local_vars.clone();
-                if func.func_type == "auto" { self.local_vars = HashMap::new(); }
+                let save_locals = self.local_vars.clone();
+                self.parent_locals.push(save_locals.clone());
+                self.local_vars = std::collections::HashMap::new();
                 for (param, val) in func.params.iter().zip(evaluated_args.into_iter()) {
                     self.local_vars.insert(param.clone(), val);
                 }
@@ -733,7 +756,8 @@ impl Evaluator {
                         break;
                     }
                 }
-                self.local_vars = saved_locals;
+                self.parent_locals.pop();
+                self.local_vars = save_locals;
                 result
             }
 
