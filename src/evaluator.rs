@@ -12,6 +12,7 @@ pub enum Value {
     StringVal(String),
     Boolean(bool),
     Array(Vec<Value>),
+    Map(std::collections::HashMap<String, Value>),
     Null,
     Return(Box<Value>),
     Break,
@@ -26,6 +27,7 @@ impl PartialEq for Value {
             (Value::StringVal(a), Value::StringVal(b)) => a == b,
             (Value::Boolean(a), Value::Boolean(b)) => a == b,
             (Value::Array(a), Value::Array(b)) => a == b,
+            (Value::Map(a), Value::Map(b)) => a == b,
             (Value::Null, Value::Null) => true,
             (Value::Break, Value::Break) => true,
             (Value::Continue, Value::Continue) => true,
@@ -46,6 +48,13 @@ impl std::fmt::Display for Value {
                 let items: Vec<String> = arr.iter().map(|v| format!("{}", v)).collect();
                 write!(f, "[{}]", items.join(", "))
                 
+            }
+            Value::Map(map) => {
+                let items: Vec<String> = map
+                .iter()
+                .map(|(k, v)| format!("{}: {}", k,v))
+                .collect();
+            write!(f, "{{{}}}", items.join(","))
             }
             Value::Return(v) => write!(f, "{}", v),
             Value::Break => write!(f, ""),
@@ -201,6 +210,7 @@ impl Evaluator {
                     Value::StringVal(_) => "string",
                     Value::Boolean(_) => "boolean",
                     Value::Array(_) => "array",
+                    Value::Map(_) => "map",
                     Value::Null => "null",
                     Value::Return(_) => "return",
                     Value::Break => "break",
@@ -543,6 +553,62 @@ impl Evaluator {
                             _ => Value::Null,
                         }
                     }
+                    Value::Map(ref map) => {
+                        match method.as_str() {
+                            "keys" => {
+                                let k: Vec<Value> = map
+                                .keys()
+                                .map(|k| Value::StringVal(k.clone()))
+                                .collect();
+                            Value::Array(k)
+                            }
+                            "values" => {
+                                let v: Vec<Value> = map
+                                .values()
+                                .cloned()
+                                .collect();
+                            Value::Array(v)
+                            }
+                            "size" => {
+                                Value::Integer(map.len() as i64)
+                            }
+                            "has" => {
+                                if args.is_empty() { return Value::Null; }
+                                let key = match self.eval(args[0].clone()) {
+                                    Value::StringVal(s) => s,
+                                    _ => return Value::Boolean(false),
+                                };
+                                Value::Boolean(map.contains_key(&key))
+                            }
+                            "get" => {
+                                if args.is_empty() { return Value::Null; }
+                                let key = match self.eval(args[0].clone()) {
+                                    Value::StringVal(s) => s,
+                                    _ => return Value::Null,
+                                };
+                                map.get(&key).cloned().unwrap_or(Value::Null)
+                            }
+                            "delete" => {
+                                if args.is_empty() { return Value::Null; }
+                                let key = match self.eval(args[0].clone()) {
+                                    Value::StringVal(s) => s,
+                                    _ => return Value::Null,
+                                };
+                                let mut new_map = map.clone();
+                                new_map.remove(&key);
+                                let result = Value::Map(new_map);
+                                if self.local_vars.contains_key(&object) {
+                                    self.local_vars.insert(object.clone(), result.clone());
+                                } else {
+                                    self.global_vars.insert(object.clone(), result.clone());
+                                }
+                                result
+                            }
+                            _ => {
+                                map.get(&method).cloned().unwrap_or(Value::Null)
+                            }
+                        }
+                    }
                     _ => Value::Null,
                 }
             }
@@ -708,6 +774,15 @@ impl Evaluator {
                     self.local_vars.insert(name.clone(), val);
                 }
                 Value::Null
+            }
+
+            Node::MapLit { keys, values } => {
+                let mut map = std::collections::HashMap::new();
+                for (i, key) in keys.iter().enumerate() {
+                    let val = self.eval(*values[i].clone());
+                    map.insert(key.clone(), val);
+                }
+                Value::Map(map)
             }
 
             Node::Reply(expr) => {

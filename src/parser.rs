@@ -50,6 +50,10 @@ pub enum Node {
     Trigger { trigger_type: String, value: Box<Node> },
     Guard { condition: Box<Node>, body: Vec<Node> },
     UseModule(String),
+    MapLit {
+        keys: Vec<String>,
+        values: Vec<Box<Node>>,
+    },
 }
 
 /// Recursive descent parser state.
@@ -709,6 +713,37 @@ impl Parser {
             Token::True         => Some(Node::Boolean(true)),
             Token::False        => Some(Node::Boolean(false)),
             Token::Null         => Some(Node::Null),
+
+            Token::LBrace => {
+                let mut keys = Vec::new();
+                let mut values = Vec::new();
+
+                if self.peek() == &Token::RBrace {
+                    self.advance();
+                    return Some(Node::MapLit { keys, values});
+                }
+                loop {
+                    let key = match self.advance().clone() {
+                        Token::Ident(k) => k,
+                        other => {
+                            println!("[PARSE ERROR] Expected map key, got {:?}", other);
+                            return None;
+                        }
+                    };
+                    keys.push(key);
+                    self.expect(&Token::Colon);
+                    let val = self.parse_expression()?;
+                    values.push(Box::new(val));
+
+                    if self.peek() == &Token::Comma {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                self.expect(&Token::RBrace);
+                Some(Node::MapLit { keys, values})
+            }
 
             Token::LBracket => {
                 let mut elements = Vec::new();
