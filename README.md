@@ -31,9 +31,9 @@ Drop them somewhere. Add to PATH. Done.
 
 ### Your First Project
 
-crh init MyProject
-cd MyProject
-cor run
+1. crh init MyProject
+2. cd MyProject
+3. cor run
 
 That's it. You're coding in Connect.
 ## The Basics
