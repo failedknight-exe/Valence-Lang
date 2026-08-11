@@ -84,6 +84,11 @@ pub enum Token {
 
     // Identifier
     Ident(String),
+
+    //Error Handling
+    Attempt,
+    Rescue,
+    Always,
 }
 
 /// Lexer state for scanning source text.
@@ -298,6 +303,9 @@ impl Lexer {
             "toBool"   => Token::ToBool,
             "math"     => Token::Math,
             "file"     => Token::File,
+            "attempt"  => Token::Attempt,
+            "rescue"   => Token::Rescue,
+            "always"   => Token::Always,
             _          => Token::Ident(ident),
         }
     }

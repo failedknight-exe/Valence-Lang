@@ -17,6 +17,7 @@ pub enum Value {
     Return(Box<Value>),
     Break,
     Continue,
+    Error(String),
 }
 
 impl PartialEq for Value {
@@ -31,6 +32,7 @@ impl PartialEq for Value {
             (Value::Null, Value::Null) => true,
             (Value::Break, Value::Break) => true,
             (Value::Continue, Value::Continue) => true,
+            (Value::Error(a), Value::Error(b)) => a == b,
             _ => false,
         }
     }
@@ -59,6 +61,7 @@ impl std::fmt::Display for Value {
             Value::Return(v) => write!(f, "{}", v),
             Value::Break => write!(f, ""),
             Value::Continue => write!(f, ""),
+            Value::Error(msg) => write!(f, "{}", msg),
         }
     }
 }
@@ -100,12 +103,14 @@ impl Evaluator {
     }
 
     /// Execute a list of top-level AST nodes.
-    pub fn run(&mut self, nodes: Vec<Node>) {
-        for node in nodes {
-            self.eval(node);
+   pub fn run(&mut self, nodes: Vec<Node>) {
+    for node in nodes {
+        let result = self.eval(node);
+        if let Value::Error(msg) = result {
+            println!("[RUNTIME ERROR] {}", msg);
         }
     }
-
+}
     /// Evaluate a single AST node and return its runtime value.
     pub fn eval(&mut self, node: Node) -> Value {
         match node {
@@ -134,7 +139,7 @@ impl Evaluator {
 
             Node::UpdateDecl { name, value } => {
                 if self.constants.contains_key(&name) {
-                    println!("[RUNTIME ERROR] '{}' is a constant. Can't change.", name);
+                    println!("[RUNTIME ERROR] '{}' is a constant. Constants cannot be changed. Use varG if you need to update it.", name);
                     return Value::Null;
                 }
                 let val = self.eval(*value);
@@ -143,7 +148,7 @@ impl Evaluator {
                 } else if self.global_vars.contains_key(&name) {
                     self.global_vars.insert(name, val.clone());
                 } else {
-                    println!("[RUNTIME ERROR] '{}' doesn't exist.", name);
+                    println!("[RUNTIME ERROR] '{}' doesn't exist. Can not update a non-existent variable.", name);
                 }
                 val
             }
@@ -180,7 +185,7 @@ impl Evaluator {
                 if let Some(val) = self.constants.get(&name) {
                     return val.clone();
                 }
-                println!("[RUNTIME ERROR] '{}' was never declared.", name);
+                println!("[RUNTIME ERROR] '{}' was never declared. Check spelling or declare with varL/varG", name);
                 Value::Null
             }
 
@@ -200,15 +205,22 @@ impl Evaluator {
     if let Some(val) = self.constants.get(&name) {
         return val.clone();
     }
-    println!("[RUNTIME ERROR] '{}' was never declared.", name);
+    println!("[RUNTIME ERROR] '{}' could not be summoned. It doesn't exist in any parent scope. Declare it first.", name);
     Value::Null
 }
 
             Node::Print(expr) => {
-                let val = self.eval(*expr);
-                println!("{}", val);
-                val
-            }
+    let val = self.eval(*expr);
+    match val {
+        Value::Error(ref msg) => {
+            return Value::Error(msg.clone());
+        }
+        _ => {
+            println!("{}", val);
+            val
+        }
+    }
+}
 
             Node::InputExpr(prompt) => {
                 let prompt_val = self.eval(*prompt);
@@ -237,6 +249,8 @@ impl Evaluator {
                     Value::Return(_) => "return",
                     Value::Break => "break",
                     Value::Continue => "continue",
+                    Value::Error(_) => "error",
+                    _ => "unknown",
                 };
                 Value::StringVal(type_name.to_string())
             }
@@ -722,19 +736,19 @@ impl Evaluator {
             Node::FuncCall { name, args } => {
                 let func = match self.functions.get(&name) {
                     Some(f) => f.clone(),
-                    None => { println!("[RUNTIME ERROR] Function '{}' doesn't exist.", name); return Value::Null; }
+                    None => { println!("[RUNTIME ERROR] Function '{}' doesn't exist. Declare it with func[callable] before calling", name); return Value::Null; }
                 };
 
                 if func.func_type == "onetime" {
                     if self.onetime_used.contains(&name) {
-                        println!("[RUNTIME ERROR] '{}' already ran.", name);
+                        println!("[RUNTIME ERROR] '{}' is a onetime function that already ran. It retired. Let it rest.", name);
                         return Value::Null;
                     }
                     self.onetime_used.insert(name.clone());
                 }
 
                 if func.params.len() != args.len() {
-                    println!("[RUNTIME ERROR] '{}' expects {} args but got {}.", name, func.params.len(), args.len());
+                    println!("[RUNTIME ERROR] '{}' expects {} arguments but received {}. check your function calls", name, func.params.len(), args.len());
                     return Value::Null;
                 }
 
@@ -809,6 +823,44 @@ impl Evaluator {
                 Value::Map(map)
             }
 
+            Node::Attempt { body, rescue_param, rescue_body, always_body} => {
+                let mut error_occurred = false;
+                let mut error_message = String::new();
+                for node in body {
+                    let result = self.eval(node);
+                    match result {
+                        Value::Error(ref msg) => {
+                            error_occurred = true;
+                            error_message = msg.clone();
+                            break;
+                        }
+                        Value::Return(_) => return result,
+                        Value::Break => return result,
+                        Value::Continue => return result,
+                        _ => {}
+                    }
+                }
+                if error_occurred {
+                    if let Some(rbody) = rescue_body {
+                        if let Some(param_name) = rescue_param {
+                            self.local_vars.insert(
+                                param_name,
+                                Value::StringVal(error_message.clone())
+                            );
+                        }
+                        for node in rbody {
+                            self.eval(node);
+                        }
+                    }
+                }
+                if let Some(abody) = always_body {
+                    for node in abody {
+                        self.eval(node);
+                    }
+                }
+                Value::Null
+            }
+
             Node::Reply(expr) => {
                 let val = self.eval(*expr);
                 Value::Return(Box::new(val))
@@ -845,7 +897,9 @@ impl Evaluator {
                 "Plus" => Value::Integer(l + r),
                 "Minus" => Value::Integer(l - r),
                 "Star" => Value::Integer(l * r),
-                "Slash" => if *r == 0 { Value::Null } else { Value::Integer(l / r) },
+                "Slash" => if *r == 0 {
+                    Value::Error("Division by zero. You divided by 0! Math ain't mathing bro.".to_string())
+                } else { Value::Integer(l / r) },
                 "Percent" => Value::Integer(l % r),
                 "DoubleStar" => if *r < 0 { Value::Null } else { Value::Integer(l.pow(*r as u32)) },
                 "EqualEqual" => Value::Boolean(l == r),

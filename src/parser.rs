@@ -55,6 +55,12 @@ pub enum Node {
         keys: Vec<String>,
         values: Vec<Box<Node>>,
     },
+    Attempt {
+        body: Vec<Node>,
+        rescue_param: Option<String>,
+        rescue_body: Option<Vec<Node>>,
+        always_body: Option<Vec<Node>>,
+    },
 }
 
 /// Recursive descent parser state.
@@ -224,6 +230,7 @@ impl Parser {
                 self.expect(&Token::RParen);
                 Some(Node::FileCall { method, args })
             }
+            Token::Attempt => self.parse_attempt(),
             _ => {
                 println!("[PARSE ERROR] Unexpected token: {:?}", self.peek());
                 self.advance();
@@ -460,6 +467,77 @@ impl Parser {
             body,
             or_checks,
             else_body,
+        })
+    }
+
+    fn parse_attempt(&mut self) -> Option<Node> {
+        self.advance();
+        self.expect(&Token::LBrace);
+        let mut body = Vec::new();
+        loop {
+            match self.peek() {
+                Token::RBrace | Token::EOF => break,
+                Token::Newline => { self.advance(); }
+                _ => {
+                    if let Some(node) = self.parse_statement() {
+                        body.push(node);
+                    }
+                }
+            }
+        }
+        self.expect(&Token::RBrace);
+        let mut rescue_param: Option<String> = None;
+        let mut rescue_body: Option<Vec<Node>> = None;
+        if self.peek() == &Token::Rescue {
+            self.advance();
+            if self.peek() == &Token::LParen {
+                self.advance();
+                rescue_param = match self.advance().clone() {
+                    Token::Ident(name) => Some(name),
+                    _ => None,
+                };
+                self.expect(&Token::RParen);
+            }
+            self.expect(&Token::LBrace);
+            let mut rbody = Vec::new();
+            loop {
+                match self.peek() {
+                    Token::RBrace | Token::EOF => break,
+                    Token::Newline => { self.advance(); }
+                    _ => {
+                        if let Some(node) = self.parse_statement() {
+                            rbody.push(node);
+                        }
+                    }
+                }
+            }
+            self.expect(&Token::RBrace);
+            rescue_body = Some(rbody);
+        }
+        let mut always_body: Option<Vec<Node>> = None;
+        if self.peek() == &Token::Always {
+            self.advance();
+            self.expect(&Token::LBrace);
+            let mut abody = Vec::new();
+            loop {
+                match self.peek() {
+                    Token::RBrace | Token::EOF => break,
+                    Token::Newline => { self.advance(); }
+                    _ => {
+                        if let Some(node) = self.parse_statement() {
+                            abody.push(node);
+                        }
+                    }
+                }
+            }
+            self.expect(&Token::RBrace);
+            always_body = Some(abody);
+        }
+        Some(Node::Attempt {
+            body,
+            rescue_param,
+            rescue_body,
+            always_body,
         })
     }
 
@@ -916,4 +994,5 @@ impl Parser {
             }
         }
     }
+
 }
