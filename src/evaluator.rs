@@ -139,8 +139,7 @@ impl Evaluator {
 
             Node::UpdateDecl { name, value } => {
                 if self.constants.contains_key(&name) {
-                    println!("[RUNTIME ERROR] '{}' is a constant. Constants cannot be changed. Use varG if you need to update it.", name);
-                    return Value::Null;
+                    return Value::Error(format!("'{}' is a constant. Can not change. Use varG instead.", name));
                 }
                 let val = self.eval(*value);
                 if self.local_vars.contains_key(&name) {
@@ -148,7 +147,7 @@ impl Evaluator {
                 } else if self.global_vars.contains_key(&name) {
                     self.global_vars.insert(name, val.clone());
                 } else {
-                    println!("[RUNTIME ERROR] '{}' doesn't exist. Can not update a non-existent variable.", name);
+                    return Value::Error(format!("'{}' doesn't exist. Can not update what was never declared.", name));
                 }
                 val
             }
@@ -185,8 +184,7 @@ impl Evaluator {
                 if let Some(val) = self.constants.get(&name) {
                     return val.clone();
                 }
-                println!("[RUNTIME ERROR] '{}' was never declared. Check spelling or declare with varL/varG", name);
-                Value::Null
+                Value::Error(format!("'{}' was never declared. Check spelling or use varL/varG.", name))
             }
 
             Node::Summon(name) => {
@@ -205,8 +203,7 @@ impl Evaluator {
     if let Some(val) = self.constants.get(&name) {
         return val.clone();
     }
-    println!("[RUNTIME ERROR] '{}' could not be summoned. It doesn't exist in any parent scope. Declare it first.", name);
-    Value::Null
+    Value::Error(format!("'{}' could not be summoned. Not in any scope.", name))
 }
 
             Node::Print(expr) => {
@@ -262,7 +259,7 @@ impl Evaluator {
                     Value::Float(f) => Value::Integer(f as i64),
                     Value::StringVal(s) => match s.parse::<i64>() {
                         Ok(n) => Value::Integer(n),
-                        Err(_) => Value::Null,
+                        Err(_) => Value::Error(format!("Can not convert '{}' to integer.", s)),
                     },
                     Value::Boolean(b) => Value::Integer(if b { 1 } else { 0 }),
                     _ => Value::Null,
@@ -276,7 +273,7 @@ impl Evaluator {
                     Value::Integer(n) => Value::Float(n as f64),
                     Value::StringVal(s) => match s.parse::<f64>() {
                         Ok(f) => Value::Float(f),
-                        Err(_) => Value::Null,
+                        Err(_) => Value::Error(format!("Can not convert '{}' to float.", s)),
                     },
                     _ => Value::Null,
                 }
@@ -368,7 +365,7 @@ impl Evaluator {
                         let path = match self.eval(args[0].clone()) { Value::StringVal(s) => s, _ => return Value::Null };
                         match std::fs::read_to_string(&path) {
                             Ok(content) => Value::StringVal(content),
-                            Err(_) => Value::Null,
+                            Err(_) => Value::Error(format!("Could not read file '{}'.", path)),
                         }
                     }
                     "write" => {
@@ -377,7 +374,7 @@ impl Evaluator {
                         let content = format!("{}", self.eval(args[1].clone()));
                         match std::fs::write(&path, content) {
                             Ok(_) => Value::Boolean(true),
-                            Err(_) => Value::Boolean(false),
+                            Err(_) => Value::Error(format!("Could not write to'{}'.", path)),
                         }
                     }
                     "append" => {
@@ -387,7 +384,7 @@ impl Evaluator {
                         use std::io::Write as IoWrite;
                         match std::fs::OpenOptions::new().append(true).create(true).open(&path) {
                             Ok(mut f) => { let _ = f.write_all(content.as_bytes()); Value::Boolean(true) }
-                            Err(_) => Value::Boolean(false),
+                            Err(_) => Value::Error(format!("Could not append to '{}'.", path)),
                         }
                     }
                     "exists" => {
@@ -407,6 +404,84 @@ impl Evaluator {
                 }
             }
 
+            Node::JsonCall { method, args } => {
+                match method.as_str() {
+                    "stringify" => {
+                        if args.is_empty() { return Value::Null; }
+                        let val = self.eval(args[0].clone());
+                        match val {
+                            Value::Map(ref map) => {
+                                let pairs: Vec<String> = map 
+                                    .iter()
+                                    .map(|(k, v)| {
+                                        let val_str = match v {
+                                            Value::StringVal(s) => format!("\"{}\"", s),
+                                            Value::Integer(n) => format!("{}", n),
+                                            Value::Float(f) => format!("{}", f),
+                                            Value::Boolean(b) => format!("{}", b),
+                                            Value::Null => "null".to_string(),
+                                            other => format!("{}", other),
+                                        };
+                                        format!("\"{}\":{}", k, val_str)
+                                    })
+                                    .collect();
+                                Value::StringVal(format!("{{{}}}", pairs.join(",")))
+                            }
+                            Value::Array (ref arr) => {
+                                let items: Vec<String> = arr
+                                    .iter()
+                                    .map(|v| match v {
+                                        Value::StringVal(s) => format!("\"{}\"", s),
+                                        other => format!("{}", other)
+                                    })
+                                    .collect();
+                                Value::StringVal(format!("[{}]", items.join(",")))
+                            }
+                            other => Value::StringVal(format!("{}", other))
+                        }
+                    }
+                    "parse" => {
+                        if args.is_empty() { return Value::Null; }
+                        let text = match self.eval(args[0].clone()) {
+                            Value::StringVal(s) => s,
+                            _ => return Value::Error("json.parse needs a string".to_string()),
+                        };
+                        let trimmed = text.trim();
+                        if trimmed.starts_with('{') {
+                            let mut map = std::collections::HashMap::new();
+                            let inner = &trimmed[1..trimmed.len() - 1];
+                            for pair in inner.split(',') {
+                                let kv: Vec<&str> = pair.splitn(2, ':').collect();
+                                if kv.len() == 2 {
+                                    let key = kv[0].trim().trim_matches('"').to_string();
+                                    let val_str = kv[1].trim();
+                                    let val = if val_str.starts_with('"') {
+                                        Value::StringVal(val_str.trim_matches('"').to_string())
+                                    } else if val_str == "true" {
+                                        Value::Boolean(true)
+                                    } else if val_str == "false" {
+                                        Value::Boolean(false)
+                                    } else if val_str == "null" {
+                                        Value::Null
+                                    } else if let Ok(n) = val_str.parse::<i64>() {
+                                        Value::Integer(n)
+                                    } else if let Ok(f) = val_str.parse::<f64>() {
+                                        Value::Float(f)
+                                    } else {
+                                        Value::StringVal(val_str.to_string())
+                                    };
+                                    map.insert(key, val);
+                                    }
+                                }
+                                Value::Map(map)
+                            } else {
+                                Value::Error("json.parse: invalid format".to_string())
+                            }
+                        }
+                        _ => Value::Error(format!("'{}' is not a valid json method", method)),
+                    }
+                }
+
             Node::UseModule(path) => {
                 match std::fs::read_to_string(&path) {
                     Ok(source) => {
@@ -416,7 +491,7 @@ impl Evaluator {
                         let ast = parser.parse();
                         for node in ast { self.eval(node); }
                     }
-                    Err(_) => { println!("[RUNTIME ERROR] Could not load '{}'.", path); }
+                    Err(_) => { return Value::Error(format!("Could not load module '{}'.", path)); }
                 }
                 Value::Null
             }
@@ -437,12 +512,16 @@ impl Evaluator {
                 let idx = match self.eval(*index) { Value::Integer(i) => i as usize, _ => return Value::Null };
                 let arr = if let Some(val) = self.local_vars.get(&name) { val.clone() }
                     else if let Some(val) = self.global_vars.get(&name) { val.clone() }
-                    else { return Value::Null; };
+                    else { return Value::Error(format!("'{}' was never declared", name)); };
                 match arr {
                     Value::Array(elements) => {
-                        if idx < elements.len() { elements[idx].clone() } else { Value::Null }
+                        if idx < elements.len() {
+                            elements[idx].clone()
+                        } else {
+                            Value::Error(format!("Index [{}] out of bounds. Array has {} elements.", idx, elements.len()))
+                        }
                     }
-                    _ => Value::Null,
+                    _ => Value::Error(format!("'{}' is not an array.", name)),
                 }
             }
 
@@ -736,20 +815,18 @@ impl Evaluator {
             Node::FuncCall { name, args } => {
                 let func = match self.functions.get(&name) {
                     Some(f) => f.clone(),
-                    None => { println!("[RUNTIME ERROR] Function '{}' doesn't exist. Declare it with func[callable] before calling", name); return Value::Null; }
+                    None => { return Value::Error(format!("Function '{}' does not exist.", name)); }
                 };
 
                 if func.func_type == "onetime" {
                     if self.onetime_used.contains(&name) {
-                        println!("[RUNTIME ERROR] '{}' is a onetime function that already ran. It retired. Let it rest.", name);
-                        return Value::Null;
+                        return Value::Error(format!("'{}' is onetime. Already ran. Let it rest.", name));
                     }
                     self.onetime_used.insert(name.clone());
                 }
 
                 if func.params.len() != args.len() {
-                    println!("[RUNTIME ERROR] '{}' expects {} arguments but received {}. check your function calls", name, func.params.len(), args.len());
-                    return Value::Null;
+                    return Value::Error(format!("'{}' expects {} args but got {}.", name, func.params.len(), args.len()));
                 }
 
                 let mut evaluated_args = Vec::new();

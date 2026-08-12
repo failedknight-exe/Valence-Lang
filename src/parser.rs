@@ -61,6 +61,8 @@ pub enum Node {
         rescue_body: Option<Vec<Node>>,
         always_body: Option<Vec<Node>>,
     },
+    JsonCall { method: String, args: Vec<Node> },
+    DateCall { method: String, args: Vec<Node> },
 }
 
 /// Recursive descent parser state.
@@ -230,6 +232,27 @@ impl Parser {
                 self.expect(&Token::RParen);
                 Some(Node::FileCall { method, args })
             }
+
+            Token::Json => {
+                self.advance();
+                self.expect(&Token::Dot);
+                let method = match self.advance().clone() {
+                    Token::Ident(m) => m,
+                    _ => return None,
+                };
+                self.expect(&Token::LParen);
+                let mut args = Vec::new();
+                if self.peek() != &Token::RParen {
+                    args.push(self.parse_expression()?);
+                    while self.peek() == &Token::Comma {
+                        self.advance();
+                        args.push(self.parse_expression()?);
+                    }
+                }
+                self.expect(&Token::RParen);
+                Some(Node::JsonCall { method, args})
+            }
+
             Token::Attempt => self.parse_attempt(),
             _ => {
                 println!("[PARSE ERROR] Unexpected token: {:?}", self.peek());
@@ -935,6 +958,21 @@ impl Parser {
                 }
                 self.expect(&Token::RParen);
                 Some(Node::FileCall { method, args })
+            }
+
+            Token::Json => {
+                self.expect(&Token::Dot);
+                let method = match self.advance().clone() {
+                    Token::Ident(m) => m,
+                    _ => return None,
+                };
+                self.expect(&Token::LParen);
+                let mut args = Vec::new();
+                if self.peek() != &Token::RParen {
+                    args.push(self.parse_expression()?);
+                }
+                self.expect(&Token::RParen);
+                Some(Node::JsonCall { method, args })
             }
 
             Token::Ident(name) => {

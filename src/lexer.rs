@@ -89,6 +89,10 @@ pub enum Token {
     Attempt,
     Rescue,
     Always,
+
+    //Backend
+    Json,
+    Date,
 }
 
 /// Lexer state for scanning source text.
@@ -306,6 +310,8 @@ impl Lexer {
             "attempt"  => Token::Attempt,
             "rescue"   => Token::Rescue,
             "always"   => Token::Always,
+            "json"     => Token::Json,
+            "date"     => Token::Date,
             _          => Token::Ident(ident),
         }
     }
