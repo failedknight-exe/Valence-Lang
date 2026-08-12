@@ -253,6 +253,25 @@ impl Parser {
                 Some(Node::JsonCall { method, args})
             }
 
+            Token::Date => {
+                self.advance();
+                self.expect(&Token::Dot);
+                let method = match self.advance().clone() {
+                    Token::Ident(m) => m,
+                    _ => return None,
+                };
+                let mut args = Vec::new();
+                self.expect(&Token::LParen);
+                if self.peek() != &Token::RParen {
+                    args.push(self.parse_expression()?);
+                    while self.peek() == &Token::Comma {
+                        self.advance();
+                        args.push(self.parse_expression()?);
+                    }
+                }
+                self.expect(&Token::RParen);
+                Some(Node::DateCall { method, args })
+            }
             Token::Attempt => self.parse_attempt(),
             _ => {
                 println!("[PARSE ERROR] Unexpected token: {:?}", self.peek());
@@ -973,6 +992,27 @@ impl Parser {
                 }
                 self.expect(&Token::RParen);
                 Some(Node::JsonCall { method, args })
+            }
+
+            Token::Date => {
+                self.expect(&Token::Dot);
+                let method = match self.advance().clone() {
+                    Token::Ident(m) => m,
+                    _ => return None,
+                };
+                let mut args = Vec::new();
+                if self.peek() == &Token::LParen {
+                    self.advance();
+                    if self.peek() != &Token::RParen {
+                        args.push(self.parse_expression()?);
+                        while self.peek() == &Token::Comma {
+                            self.advance();
+                            args.push(self.parse_expression()?);
+                        }
+                    }
+                    self.expect(&Token::RParen);
+                }
+                Some(Node::DateCall { method, args })
             }
 
             Token::Ident(name) => {
