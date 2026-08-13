@@ -93,6 +93,7 @@ pub enum Token {
     //Backend
     Json,
     Date,
+    System,
 }
 
 /// Lexer state for scanning source text.
@@ -312,6 +313,7 @@ impl Lexer {
             "always"   => Token::Always,
             "json"     => Token::Json,
             "date"     => Token::Date,
+            "system"   => Token::System,
             _          => Token::Ident(ident),
         }
     }
