@@ -2,7 +2,7 @@
 
 use crate::parser::Node;
 use std::collections::{HashMap, HashSet};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 
 /// Runtime values supported by the language.
 #[derive(Debug, Clone)]
@@ -696,9 +696,10 @@ impl Evaluator {
                         };
                         match ureq::get(&url).call() {
                             Ok(response) => {
-                                match response.into_string() {
-                                    Ok(body) => {
-                                        match std::fs::write(&filename, body.as_bytes()) {
+                                let mut bytes = Vec::new();
+                                match response.into_reader().read_to_end(&mut bytes) {
+                                    Ok(_) => {
+                                        match std::fs::write(&filename, &bytes) {
                                             Ok(_) => Value::Boolean(true),
                                             Err(e) => Value::Error(format!("Failed to save: {}", e)),
                                         }
