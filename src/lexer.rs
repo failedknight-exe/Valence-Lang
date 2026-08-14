@@ -94,6 +94,7 @@ pub enum Token {
     Json,
     Date,
     System,
+    Http,
 }
 
 /// Lexer state for scanning source text.
@@ -314,6 +315,7 @@ impl Lexer {
             "json"     => Token::Json,
             "date"     => Token::Date,
             "system"   => Token::System,
+            "http"     => Token::Http,
             _          => Token::Ident(ident),
         }
     }

@@ -64,6 +64,7 @@ pub enum Node {
     JsonCall { method: String, args: Vec<Node> },
     DateCall { method: String, args: Vec<Node> },
     SystemCall { method: String, args: Vec<Node> },
+    HttpCall { method: String, args: Vec<Node> },
 }
 
 /// Recursive descent parser state.
@@ -294,6 +295,26 @@ impl Parser {
                     self.expect(&Token::RParen);
                 }
                 Some(Node::SystemCall { method, args })
+            }
+
+            Token::Http => {
+                self.advance();
+                self.expect(&Token::Dot);
+                let method = match self.advance().clone() {
+                    Token::Ident(m) => m,
+                    _ => return None,
+                };
+                self.expect(&Token::LParen);
+                let mut args = Vec::new();
+                if self.peek() != &Token::RParen {
+                    args.push(self.parse_expression()?);
+                    while self.peek() == &Token::Comma {
+                        self.advance();
+                        args.push(self.parse_expression()?);
+                    }
+                }
+                self.expect(&Token::RParen);
+                Some(Node::HttpCall { method, args })
             }
 
             Token::Attempt => self.parse_attempt(),
@@ -1058,6 +1079,25 @@ impl Parser {
                     self.expect(&Token::RParen);
                 }
                 Some(Node::SystemCall { method, args })
+            }
+
+            Token::Http => {
+                self.expect(&Token::Dot);
+                let method = match self.advance().clone() {
+                    Token::Ident(m) => m,
+                    _ => return None,
+                };
+                self.expect(&Token::LParen);
+                let mut args = Vec::new();
+                if self.peek() != &Token::RParen {
+                    args.push(self.parse_expression()?);
+                    while self.peek() == &Token::Comma {
+                        self.advance();
+                        args.push(self.parse_expression()?);
+                    }
+                }
+                self.expect(&Token::RParen);
+                Some(Node::HttpCall { method, args })
             }
 
             Token::Ident(name) => {

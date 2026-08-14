@@ -13,3 +13,4 @@ path = "src/crh_main.rs"
 
 [dependencies]
 chrono = "0.4"
+ureq = "2.9"
