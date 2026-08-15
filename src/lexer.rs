@@ -95,6 +95,7 @@ pub enum Token {
     Date,
     System,
     Http,
+    Crypto,
 }
 
 /// Lexer state for scanning source text.
@@ -316,6 +317,7 @@ impl Lexer {
             "date"     => Token::Date,
             "system"   => Token::System,
             "http"     => Token::Http,
+            "crypto"   => Token::Crypto,
             _          => Token::Ident(ident),
         }
     }
