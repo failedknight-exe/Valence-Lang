@@ -1172,6 +1172,155 @@ impl Evaluator {
                                 let times = match self.eval(args[0].clone()) { Value::Integer(i) => i as usize, _ => 1 };
                                 Value::StringVal(s.repeat(times))
                             }
+                            "capitalize" => {
+                                let words: Vec<String> = s.split(' ')
+                                    .map(|w| {
+                                        let mut chars = w.chars();
+                                        match chars.next() {
+                                            Some(first) => {
+                                                let upper = first.to_uppercase().to_string();
+                                                upper + &chars.collect::<String>()
+                                            }
+                                            None => String::new(),
+                                        }
+                                    })
+                                    .collect();
+                                Value::StringVal(words.join(" "))
+                            }
+                            "camelCase" => {
+                                let words: Vec<&str> = s.split(' ').collect();
+                                let mut result = String::new();
+                                for (i, word) in words.iter().enumerate() {
+                                    if i == 0 {
+                                        result.push_str(&word.to_lowercase());
+                                    } else {
+                                        let mut chars = word.chars();
+                                        if let Some(first) = chars.next() {
+                                            result.push_str(&first.to_uppercase().to_string());
+                                            result.push_str(&chars.collect::<String>().to_lowercase());
+                                        }
+                                    }
+                                }
+                                Value::StringVal(result)
+                            }
+                            "snakeCase" => {
+                                let mut result = String::new();
+                                for (i, c) in s.chars().enumerate() {
+                                    if c.is_uppercase() {
+                                        if i > 0 { result.push('_'); }
+                                        result.push(c.to_lowercase().next().unwrap());
+                                    } else if c == ' ' {
+                                        result.push('_');
+                                    } else {
+                                        result.push(c);
+                                    }
+                                }
+                                Value::StringVal(result)
+                            }
+                            "padLeft" => {
+                                if args.len() < 2 { return Value::Null; }
+                                let width = match self.eval(args[0].clone()) {
+                                    Value::Integer(n) => n as usize,
+                                    _ => return Value::Null,
+                                };
+                                let pad_char = match self.eval(args[1].clone()) {
+                                    Value::StringVal(c) => c.chars().next().unwrap_or(' '),
+                                    _ => ' ',
+                                };
+                                if s.len() >= width {
+                                    Value::StringVal(s.clone())
+                                } else {
+                                    let padding = std::iter::repeat(pad_char).take(width - s.len()).collect::<String>();
+                                    Value::StringVal(format!("{}{}", padding, s))
+                                }
+                            }
+                            "padRight" => {
+                                if args.len() < 2 { return Value::Null; }
+                                let width = match self.eval(args[0].clone()) {
+                                    Value::Integer(n) => n as usize,
+                                    _ => return Value::Null,
+                                };
+                                let pad_char = match self.eval(args[1].clone()) {
+                                    Value::StringVal(c) => c.chars().next().unwrap_or(' '),
+                                    _ => ' ',
+                                };
+                                if s.len() >= width {
+                                    Value::StringVal(s.clone())
+                                } else {
+                                    let padding = std::iter::repeat(pad_char).take(width - s.len()).collect::<String>();
+                                    Value::StringVal(format!("{}{}", s, padding))
+                                }
+                            }
+                            "isNumeric" => {
+                                Value::Boolean(s.chars().all(|c| c.is_numeric()))
+                            }
+                            "isAlpha" => {
+                                Value::Boolean(s.chars().all(|c| c.is_alphabetic()))
+                            }
+                            "isEmail" => {
+                                Value::Boolean(s.contains('@') && s.contains('.') && s.len() > 5)
+                            }
+                            "wordCount" => {
+                                Value::Integer(s.split_whitespace().count() as i64)
+                            }
+                            "truncate" => {
+                                if args.is_empty() { return Value::StringVal(s.clone()); }
+                                let max_len = match self.eval(args[0].clone()) {
+                                    Value::Integer(n) => n as usize,
+                                    _ => return Value::StringVal(s.clone()),
+                                };
+                                if s.len() <= max_len {
+                                    Value::StringVal(s.clone())
+                                } else {
+                                    Value::StringVal(format!("{}...", &s[..max_len]))
+                                }
+                            }
+                            "slug" => {
+                                let result = s.to_lowercase()
+                                    .chars()
+                                    .map(|c| {
+                                        if c.is_alphanumeric() { c }
+                                        else if c == ' ' { '-' }
+                                        else { ' ' }
+                                    })
+                                    .collect::<String>();
+                                let cleaned = result.split_whitespace().collect::<Vec<&str>>().join("");
+                                Value::StringVal(cleaned)
+                            }
+                            "urlEncode" => {
+                                let mut result = String::new();
+                                for c in s.chars() {
+                                    match c {
+                                        'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' => {
+                                            result.push(c);
+                                        }
+                                        ' ' => result.push_str("%20"),
+                                        _ => {
+                                            for b in c.to_string().bytes() {
+                                                result.push_str(&format!("%{:02X}", b));
+                                            }
+                                        }
+                                    }
+                                }
+                                Value::StringVal(result)
+                            }
+                            "urlDecode" => {
+                                let mut result = String::new();
+                                let mut chars = s.chars();
+                                while let Some(c) = chars.next() {
+                                    if c == '%' {
+                                        let hex: String = chars.by_ref().take(2).collect();
+                                        if let Ok(byte) = u8::from_str_radix(&hex, 16) {
+                                            result.push(byte as char);
+                                        }
+                                    } else if c == '+' {
+                                        result.push(' ');
+                                    } else {
+                                        result.push(c);
+                                    }
+                                }
+                                Value::StringVal(result)
+                            }
                             _ => Value::Null,
                         }
                     }
