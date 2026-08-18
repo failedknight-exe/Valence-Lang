@@ -1684,6 +1684,16 @@ impl Evaluator {
                 Value::Null
             }
 
+            Node::AsyncBlock { body } => {
+                let mut forked = self.fork();
+                std::thread::spawn(move || {
+                    for node in body {
+                        forked.eval(node);
+                    }
+                });
+                Value::Null
+            }
+
             Node::Reply(expr) => {
                 let val = self.eval(*expr);
                 Value::Return(Box::new(val))

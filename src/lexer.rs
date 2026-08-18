@@ -95,6 +95,7 @@ pub enum Token {
     System,
     Http,
     Crypto,
+    Async,
 }
 
 /// Lexer state for scanning source text.
@@ -316,6 +317,7 @@ impl Lexer {
             "system"   => Token::System,
             "http"     => Token::Http,
             "crypto"   => Token::Crypto,
+            "async"    => Token::Async,
             _          => Token::Ident(ident),
         }
     }

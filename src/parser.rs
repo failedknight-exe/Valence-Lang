@@ -70,6 +70,7 @@ pub enum Node {
     SystemCall { method: String, args: Vec<Node> },
     HttpCall { method: String, args: Vec<Node> },
     CryptoCall { method: String, args: Vec<Node> },
+    AsyncBlock { body: Vec<Node> },
 }
 
 /// Recursive descent parser state.
@@ -342,6 +343,25 @@ impl Parser {
                     self.expect(&Token::RParen);
                 }
                 Some(Node::CryptoCall { method, args })
+            }
+
+            Token::Async => {
+                self.advance();
+                self.expect(&Token::LBrace);
+                let mut body = Vec::new();
+                loop {
+                    match self.peek() {
+                        Token::RBrace | Token::EOF => break,
+                        Token::Newline => { self.advance(); }
+                        _ => {
+                            if let Some(node) = self.parse_statement() {
+                                body.push(node);
+                            }
+                        }
+                    }
+                }
+                self.expect(&Token::RBrace);
+                Some(Node::AsyncBlock { body })
             }
 
             Token::Attempt => self.parse_attempt(),
