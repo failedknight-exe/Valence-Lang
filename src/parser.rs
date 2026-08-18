@@ -48,7 +48,11 @@ pub enum Node {
     Reply(Box<Node>),
     Rest(Box<Node>),
     Wait(Box<Node>),
-    Trigger { trigger_type: String, value: Box<Node> },
+    TriggerCall {
+        name: String,
+        trigger_type: String,
+        value: Box<Node>,
+    },
     Guard { condition: Box<Node>, body: Vec<Node> },
     UseModule(String),
     MapLit {
@@ -657,7 +661,6 @@ impl Parser {
         let func_type = match self.advance().clone() {
             Token::Callable => "callable".to_string(),
             Token::Auto     => "auto".to_string(),
-            Token::OneTime  => "onetime".to_string(),
             Token::Forever  => "forever".to_string(),
             _ => return None,
         };
@@ -723,16 +726,31 @@ impl Parser {
 
     fn parse_trigger(&mut self) -> Option<Node> {
         self.advance();
-        self.expect(&Token::LParen);
-        let trigger_type = match self.advance().clone() {
-            Token::When  => "when".to_string(),
-            Token::Every => "every".to_string(),
-            _ => return None,
+        let name = match self.advance().clone() {
+            Token::Ident(n) => n,
+            _ => {
+                println!("[PARSE ERROR] Expected function name after trigger");
+                return None;
+            }
         };
-        self.expect(&Token::Colon);
-        let value = self.parse_expression()?;
+        self.expect(&Token::LBracket);
+        let trigger_type = match self.advance().clone() {
+            Token::Ident(t) => t,
+            Token::When => "when".to_string(),
+            _ => {
+                println!("[PARSE ERROR] Expected trigger type: time, when, or once");
+                return None;
+            }
+        };
+        self.expect(&Token::RBracket);
+        self.expect(&Token::LParen);
+        let Value = self.parse_expression()?;
         self.expect(&Token::RParen);
-        Some(Node::Trigger { trigger_type, value: Box::new(value) })
+        Some(Node::TriggerCall {
+            name,
+            trigger_type,
+            value: Box::new(Value),
+        })
     }
 
     fn parse_guard(&mut self) -> Option<Node> {

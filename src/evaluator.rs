@@ -85,8 +85,8 @@ pub struct Evaluator {
     global_vars: HashMap<String, Value>,
     constants: HashMap<String, Value>,
     functions: HashMap<String, StoredFunc>,
-    onetime_used: HashSet<String>,
     parent_locals: Vec<HashMap<String, Value>>,
+    when_triggers: Vec<(String, Node, bool)>,
 }
 
 impl Evaluator {
@@ -97,8 +97,49 @@ impl Evaluator {
             global_vars: HashMap::new(),
             constants: HashMap::new(),
             functions: HashMap::new(),
-            onetime_used: HashSet::new(),
             parent_locals: Vec::new(),
+            when_triggers: Vec::new(),
+        }
+    }
+
+    pub fn fork(&self) -> Evaluator {
+        Evaluator {
+            local_vars: self.local_vars.clone(),
+            global_vars: self.global_vars.clone(),
+            constants: self.constants.clone(),
+            functions: self.functions.clone(),
+            parent_locals: self.parent_locals.clone(),
+            when_triggers: self.when_triggers.clone(),
+        }
+    }
+
+    pub fn check_triggers(&mut self) {
+        let triggers = self.when_triggers.clone();
+        let mut to_fire: Vec<(String, bool)> = Vec::new();
+        for (name, condition, is_once) in triggers.iter() {
+            let result = self.eval(condition.clone());
+            if let Value::Boolean(true) = result {
+                to_fire.push((name.clone(), *is_once));
+            }
+        }
+        let fired_once: Vec<String> = to_fire.iter()
+            .filter(|(_, is_once)| *is_once)
+            .map(|(name, _)| name.clone())
+            .collect();
+        self.when_triggers.retain(|(name, _, _)| {
+            !fired_once.contains(name)
+        });
+        for (name, _) in to_fire {
+            if let Some(func) = self.functions.get(&name).cloned() {
+                let saved = self.local_vars.clone();
+                self.parent_locals.push(saved.clone());
+                self.local_vars = std::collections::HashMap::new();
+                for node in func.body {
+                    self.eval(node);
+                }
+                self.parent_locals.pop();
+                self.local_vars = saved;
+            }
         }
     }
 
@@ -124,6 +165,7 @@ impl Evaluator {
             Node::VarGDecl { name, value } => {
                 let val = self.eval(*value);
                 self.global_vars.insert(name, val.clone());
+                self.check_triggers();
                 val
             }
 
@@ -146,6 +188,7 @@ impl Evaluator {
                     self.local_vars.insert(name, val.clone());
                 } else if self.global_vars.contains_key(&name) {
                     self.global_vars.insert(name, val.clone());
+                    self.check_triggers();
                 } else {
                     return Value::Error(format!("'{}' doesn't exist. Can not update what was never declared.", name));
                 }
@@ -1474,11 +1517,11 @@ impl Evaluator {
                     None => { return Value::Error(format!("Function '{}' does not exist.", name)); }
                 };
 
-                if func.func_type == "onetime" {
-                    if self.onetime_used.contains(&name) {
-                        return Value::Error(format!("'{}' is onetime. Already ran. Let it rest.", name));
-                    }
-                    self.onetime_used.insert(name.clone());
+                if func.func_type == "auto" {
+                    return Value::Error(format! (
+                        "'{}' is an auto function. Use trigger {}[time/when/once]() to activate.",
+                        name, name
+                    ));
                 }
 
                 if func.params.len() != args.len() {
@@ -1520,10 +1563,57 @@ impl Evaluator {
                 Value::Null
             }
 
-            Node::Trigger { trigger_type, value } => {
-                let val = self.eval(*value);
-                println!("[AUTO] Trigger: {} {:?}", trigger_type, val);
-                Value::Null
+            Node::TriggerCall { name, trigger_type, value } => {
+                match trigger_type.as_str() {
+                    "time" => {
+                        let ms = match self.eval(*value) {
+                            Value::Integer(n) => n as u64,
+                            _ => {
+                                return Value::Error("trigger[time] needs milliseconds".to_string());
+                            }
+                        };
+                        let func = match self.functions.get(&name).cloned() {
+                            Some(f) => f,
+                            None => {
+                                return Value::Error(format!("Function '{}' not found", name));
+                            }
+                        };
+                        let mut forked = self.fork();
+                        std::thread::spawn(move || {
+                            loop {
+                                std::thread::sleep( std::time::Duration::from_millis(ms) );
+                                let saved = forked.local_vars.clone();
+                                forked.parent_locals.push(saved.clone());
+                                forked.local_vars = std::collections::HashMap::new();
+                                for node in func.body.clone() {
+                                    forked.eval(node);
+                                }
+                                forked.parent_locals.pop();
+                                forked.local_vars = saved;
+                            }
+                        });
+                        Value::Null
+                    }
+                    "when" => {
+                        self.when_triggers.push((
+                            name,
+                            *value,
+                            false,
+                        ));
+                        Value::Null
+                    }
+                    "once" => {
+                        self.when_triggers.push((
+                            name,
+                            *value,
+                            true,
+                        ));
+                        Value::Null
+                    }
+                    _ => {
+                        Value::Error(format!("Unknown trigger type: '{}'", trigger_type))
+                    }
+                }
             }
 
             Node::Guard { condition, body } => {
