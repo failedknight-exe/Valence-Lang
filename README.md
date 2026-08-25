@@ -1,13 +1,13 @@
-# Connect
+# Valence
 
 A programming language I built from scratch in Rust.
 No frameworks. No shortcuts. Just pure code.
 
 Born out of boredom. Built out of love.
 
-## What is Connect?
+## What is Valence?
 
-Connect is an interpreted language that runs on a 
+Valence is an interpreted language that runs on a 
 Rust-native engine. It has its own lexer, parser, 
 and evaluator. Everything from variables to functions 
 to file I/O works out of the box.
@@ -19,28 +19,28 @@ Just write .cor files and run them.
 
 ### Build From Source
 
-git clone https://github.com/failedknight-exe/Connect-Lang
-cd Connect-Lang
+git clone https://github.com/failedknight-exe/Valence-Lang
+cd Valence-Lang
 cargo build --release
 
 ### Pre-Built (Windows)
 Grab cor.exe and crh.exe from 
-[Releases](https://github.com/failedknight-exe/Connect-Lang/releases)
+[Releases](https://github.com/failedknight-exe/Valence-Lang/releases)
 
 Drop them somewhere. Add to PATH. Done.
 
 ### Your First Project
 
-1. crh init MyProject
-2. cd MyProject
-3. cor run
+crh init MyProject
+cd MyProject
+cor run
 
-That's it. You're coding in Connect.
+That's it. You're coding in Valence.
 ## The Basics
 
 ### Variables
 
-Connect has three types of variables.
+Valence has three types of variables.
 Each one has its place. Each one has its rules.
 
 varL name = 'Knight'          // Local - stays in its scope
@@ -54,7 +54,7 @@ varL debt = -42               // Negatives work
 
 ### Summon
 
-Connect's secret weapon.
+Valence's secret weapon.
 varL is locked to its scope. Functions can't see it.
 Unless you summon it.
 
@@ -91,7 +91,7 @@ false                 // Boolean
 
 ## Strings
 
-Single quotes. That's the Connect way.
+Single quotes. That's the Valence way.
 Need quotes inside? Use backticks.
 
 varL text = 'Failed Knight'
@@ -115,7 +115,7 @@ print('Line 1\nLine 2')
 print('Tab\there')
 
 // Template strings
-varL msg = `He said 'Connect is fire'`
+varL msg = `He said 'Valence is fire'`
 
 ## Arrays
 
@@ -142,21 +142,21 @@ nums.clear              // []
 
 Key-value pairs. Like a dictionary but cooler.
 
-varL user = {name: 'Knight', age: 14, lang: 'Connect'}
+varL user = {name: 'Knight', age: 14, lang: 'Valence'}
 
 user.name               // Knight
 user.age                // 14
 user.size               // 3
 user.keys               // [name, age, lang]
-user.values             // [Knight, 14, Connect]
+user.values             // [Knight, 14, Valence]
 user.has('name')        // true
 user.has('email')       // false
-user.get('lang')        // Connect
+user.get('lang')        // Valence
 user.delete('age')      // removes age
 
 ## Math
 
-Connect follows PEMDAS automatically.
+Valence follows PEMDAS automatically.
 No thinking required.
 
 10 + 5                  // 15
@@ -191,7 +191,7 @@ math.log(x)              // also log10
 
 ## Conditions
 
-No if/else here. Connect uses check.
+No if/else here. Valence uses check.
 
 check (x > 5) {
     print('Big')
@@ -239,7 +239,7 @@ a <= b      // less or equal
 
 ## Loops
 
-Connect uses circle. Because loops go around.
+Valence uses circle. Because loops go around.
 The loop name becomes your counter. Clean.
 
 circle i(5) {
@@ -279,7 +279,7 @@ circle x(3) {
 
 ## Functions
 
-Functions in Connect have types.
+Functions in Valence have types.
 Each type has its own behavior.
 
 // Callable - your standard function

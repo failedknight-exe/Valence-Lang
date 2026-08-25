@@ -1,5 +1,5 @@
 [package]
-name = "connect"
+name = "valence"
 version = "0.1.0"
 edition = "2024"
 
@@ -8,8 +8,8 @@ name = "cor"
 path = "src/cor_main.rs"
 
 [[bin]]
-name = "crh"
-path = "src/crh_main.rs"
+name = "val"
+path = "src/val_main.rs"
 
 [dependencies]
 chrono = "0.4"

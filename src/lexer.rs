@@ -96,6 +96,7 @@ pub enum Token {
     Http,
     Crypto,
     Async,
+    Protect,
 }
 
 /// Lexer state for scanning source text.
@@ -318,6 +319,7 @@ impl Lexer {
             "http"     => Token::Http,
             "crypto"   => Token::Crypto,
             "async"    => Token::Async,
+            "protect"  => Token::Protect,
             _          => Token::Ident(ident),
         }
     }

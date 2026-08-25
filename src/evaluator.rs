@@ -87,6 +87,7 @@ pub struct Evaluator {
     functions: HashMap<String, StoredFunc>,
     parent_locals: Vec<HashMap<String, Value>>,
     when_triggers: Vec<(String, Node, bool)>,
+    pub protected_vars: HashSet<String>,
 }
 
 impl Evaluator {
@@ -99,6 +100,7 @@ impl Evaluator {
             functions: HashMap::new(),
             parent_locals: Vec::new(),
             when_triggers: Vec::new(),
+            protected_vars: HashSet::new(),
         }
     }
 
@@ -110,6 +112,7 @@ impl Evaluator {
             functions: self.functions.clone(),
             parent_locals: self.parent_locals.clone(),
             when_triggers: self.when_triggers.clone(),
+            protected_vars: self.protected_vars.clone(),
         }
     }
 
@@ -180,6 +183,9 @@ impl Evaluator {
             }
 
             Node::UpdateDecl { name, value } => {
+                if self.protected_vars.contains(&name) {
+                    return Value::Error(format!("Variable '{}' is protected and cannot be mutated", name));
+                }
                 if self.constants.contains_key(&name) {
                     return Value::Error(format!("'{}' is a constant. Can not change. Use varG instead.", name));
                 }
@@ -196,6 +202,9 @@ impl Evaluator {
             }
 
             Node::UpdateIndex { name, index, value } => {
+                if self.protected_vars.contains(&name) {
+                    return Value::Error(format!("Variable '{}' is protected and cannot be mutated.", name));
+                }
                 let idx = match self.eval(*index) {
                     Value::Integer(i) => i as usize,
                     _ => return Value::Null,
@@ -234,7 +243,7 @@ impl Evaluator {
     if let Some(val) = self.local_vars.get(&name) {
         return val.clone();
     }
-    for (i, parent) in self.parent_locals.iter().rev().enumerate() {
+    for parent in self.parent_locals.iter().rev() {
         if let Some(val) = parent.get(&name) {
             self.local_vars.insert(name.clone(), val.clone());
             return val.clone();
@@ -290,7 +299,6 @@ impl Evaluator {
                     Value::Break => "break",
                     Value::Continue => "continue",
                     Value::Error(_) => "error",
-                    _ => "unknown",
                 };
                 Value::StringVal(type_name.to_string())
             }
@@ -900,7 +908,7 @@ impl Evaluator {
                             Value::StringVal(s) => s,
                             other => format!("{}", other)
                         };
-                        let algo = if args.len() > 1 {
+                        let _algo = if args.len() > 1 {
                             match self.eval(args[1].clone()) {
                                 Value::StringVal(s) => s,
                                 _ => "sha256".to_string(),
@@ -988,10 +996,10 @@ impl Evaluator {
                         let b1 = if i + 1 < bytes.len() { bytes[i + 1] as u32 } else { 0 };
                         let b2 = if i + 2 < bytes.len() { bytes[i + 2] as u32 } else { 0 };
                         let triple = (b0 << 16) | (b1 << 8) | b2;
-                        result.push(chars.as_bytes()[(((triple >> 18) & 0x3F) as usize)] as char);
-                        result.push(chars.as_bytes()[(((triple >> 12) & 0x3F) as usize)] as char);
+                        result.push(chars.as_bytes()[((triple >> 18) & 0x3F) as usize] as char);
+                        result.push(chars.as_bytes()[((triple >> 12) & 0x3F) as usize] as char);
                         if i + 1 < bytes.len() {
-                            result.push(chars.as_bytes()[(((triple >> 6) & 0x3F) as usize)] as char);
+                            result.push(chars.as_bytes()[((triple >> 6) & 0x3F) as usize] as char);
                         } else {
                             result.push('=');
                         }
@@ -1488,13 +1496,12 @@ impl Evaluator {
                 for i in 0..times {
                     self.local_vars.insert(name.clone(), Value::Integer(i));
                     let mut should_shatter = false;
-                    let mut should_skip = false;
                     for node in body.clone() {
                         let result = self.eval(node);
                         match result {
                             Value::Return(_) => return result,
                             Value::Break => { should_shatter = true; break; },
-                            Value::Continue => { should_skip = true; break; },
+                            Value::Continue => { break; },
                             _ => {}
                         }
                     }
@@ -1692,6 +1699,35 @@ impl Evaluator {
                     }
                 });
                 Value::Null
+            }
+
+            Node::Protect { vars, body } => {
+                let to_protect: Vec<String> = if vars.is_empty() {
+                    self.local_vars.keys().cloned()
+                        .chain(self.global_vars.keys().cloned())
+                        .chain(self.constants.keys().cloned())
+                        .collect()
+                } else {
+                    vars
+                };
+                let mut newly_protected = Vec::new();
+                for v in &to_protect {
+                    if !self.protected_vars.contains(v) {
+                        self.protected_vars.insert(v.clone());
+                        newly_protected.push(v.clone());
+                    }
+                }
+                let mut result = Value::Null;
+                for statement in body {
+                    result = self.eval(statement);
+                    if let Value::Return(_) | Value::Break | Value::Continue | Value::Error(_) = result {
+                        break;
+                    }
+                }
+                for v in &newly_protected {
+                    self.protected_vars.remove(v);
+                }
+                result
             }
 
             Node::Reply(expr) => {

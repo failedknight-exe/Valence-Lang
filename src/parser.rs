@@ -71,6 +71,10 @@ pub enum Node {
     HttpCall { method: String, args: Vec<Node> },
     CryptoCall { method: String, args: Vec<Node> },
     AsyncBlock { body: Vec<Node> },
+    Protect {
+        vars: Vec<String>,
+        body: Vec<Node>,
+    },
 }
 
 /// Recursive descent parser state.
@@ -129,6 +133,49 @@ impl Parser {
         let token = &self.tokens[self.pos];
         self.pos += 1;
         token
+    }
+
+    fn parse_protect(&mut self) -> Option<Node> {
+        self.advance();
+        let mut vars = Vec::new();
+        if self.peek() == &Token::LParen {
+            self.advance();
+            if self.peek() != &Token::RParen {
+                match self.advance().clone() {
+                    Token::Ident(v) => vars.push(v),
+                    _ => {
+                        println!("[PARSE ERROR] Expected variable name inside protect(...)");
+                        return None;
+                    }
+                }
+                while self.peek() == &Token::Comma {
+                    self.advance();
+                    match self.advance().clone() {
+                        Token::Ident(v) => vars.push(v),
+                        _ => {
+                            println!("[PARSE ERROR] Expected variable name after ',' in protect");
+                            return None;
+                        }
+                    }
+                }
+            }
+            self.expect(&Token::RParen);
+        }
+        self.expect(&Token::LBrace);
+        let mut body = Vec::new();
+        loop {
+            match self.peek() {
+                Token::RBrace | Token::EOF => break,
+                Token::Newline => { self.advance(); }
+                _ => {
+                    if let Some(node) = self.parse_statement() {
+                        body.push(node);
+                    }
+                }
+            }
+        }
+        self.expect(&Token::RBrace);
+        Some(Node::Protect { vars, body })
     }
 
     /// Ensure the next token matches `expected`, consuming it if so.
@@ -363,6 +410,8 @@ impl Parser {
                 self.expect(&Token::RBrace);
                 Some(Node::AsyncBlock { body })
             }
+
+            Token::Protect => self.parse_protect(),
 
             Token::Attempt => self.parse_attempt(),
             _ => {
@@ -764,12 +813,12 @@ impl Parser {
         };
         self.expect(&Token::RBracket);
         self.expect(&Token::LParen);
-        let Value = self.parse_expression()?;
+        let value = self.parse_expression()?;
         self.expect(&Token::RParen);
         Some(Node::TriggerCall {
             name,
             trigger_type,
-            value: Box::new(Value),
+            value: Box::new(value),
         })
     }
 

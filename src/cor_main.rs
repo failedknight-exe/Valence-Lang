@@ -18,19 +18,21 @@ fn main() {
 
     if args.len() < 2 {
         println!("");
-        println!("  ██████╗ ██████╗ ██████╗ ");
-        println!(" ██╔════╝██╔═══██╗██╔══██╗");
-        println!(" ██║     ██║   ██║██████╔╝");
-        println!(" ██║     ██║   ██║██╔══██╗");
-        println!(" ╚██████╗╚██████╔╝██║  ██║");
-        println!("  ╚═════╝ ╚═════╝ ╚═╝  ╚═╝");
+        println!("  ██╗   ██╗ █████╗ ██╗     ███████╗███╗   ██╗██╗████████╗");
+        println!("  ██║   ██║██╔══██╗██║     ██╔════╝████╗  ██║██║╚══██╔══╝");
+        println!("  ██║   ██║███████║██║     █████╗  ██╔██╗ ██║██║   ██║   ");
+        println!("  ╚██╗ ██╔╝██╔══██║██║     ██╔══╝  ██║╚██╗██║██║   ██║   ");
+        println!("   ╚████╔╝ ██║  ██║███████╗███████╗██║ ╚████║██║   ██║   ");
+        println!("    ╚═══╝  ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═══╝╚═╝   ╚═╝   ");
         println!("");
-        println!(" Connect Language Runtime v1.0.0");
+        println!(" Valence Language Runtime v1.0.0");
         println!(" Sirius Zenith Labs");
         println!(" Type 'cor help' for commands");
         println!("");
         return;
     }
+    // ... rest of file stays the same
+
 
     match args[1].as_str() {
         "run" => {
