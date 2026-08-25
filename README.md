@@ -24,14 +24,14 @@ cd Valence-Lang
 cargo build --release
 
 ### Pre-Built (Windows)
-Grab cor.exe and crh.exe from 
+Grab cor.exe and val.exe from 
 [Releases](https://github.com/failedknight-exe/Valence-Lang/releases)
 
 Drop them somewhere. Add to PATH. Done.
 
 ### Your First Project
 
-crh init MyProject
+val init MyProject
 cd MyProject
 cor run
 
@@ -384,8 +384,8 @@ cor check file.cor       // Check syntax
 cor help                 // Show commands
 cor version              // Show version
 
-crh init ProjectName     // Scaffold a new project
-crh help                 // Show commands
+val init ProjectName     // Scaffold a new project
+val help                 // Show commands
 
 ## Project Structure
 
