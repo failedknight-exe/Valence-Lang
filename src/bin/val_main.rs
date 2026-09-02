@@ -23,7 +23,7 @@ fn main() {
                 return;
             };
 
-            println!("🚀 Initializing Valence project: {}...", project_name);
+            println!("Initializing Valence project: {}...", project_name);
 
             fs::create_dir_all(format!("{}/src", project_name)).unwrap();
             fs::create_dir_all(format!("{}/modules", project_name)).unwrap();
@@ -52,7 +52,7 @@ engine = "valence-cor"
 
             fs::write(format!("{}/data.toml", project_name), data_toml).unwrap();
 
-            println!("✅ Valence project '{}' initialized!", project_name);
+            println!("Valence project '{}' initialized!", project_name);
             println!("Run it with: cd {} && cor run", project_name);
         }
 
@@ -69,7 +69,7 @@ engine = "valence-cor"
 
         "install" => {
             let package = if args.len() > 2 { &args[2] } else { "package" };
-            println!("📦 Installing {}...", package);
+            println!(" Installing {}...", package);
             println!("(Valence Registry coming in v1.5)");
         }
 

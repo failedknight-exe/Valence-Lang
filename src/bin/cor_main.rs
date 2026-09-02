@@ -5,13 +5,9 @@
 use std::env;
 use std::fs;
 
-mod lexer;
-mod parser;
-mod evaluator;
-
-use lexer::Lexer;
-use parser::Parser;
-use evaluator::Evaluator;
+use valence::lexer::Lexer;
+use valence::parser::Parser;
+use valence::evaluator::Evaluator;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

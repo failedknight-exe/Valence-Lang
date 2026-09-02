@@ -1,16 +1,25 @@
 [package]
 name = "valence"
-version = "0.1.0"
-edition = "2024"
+version = "0.2.1"
+edition = "2021"
+authors = ["Failed Knight"]
+description = "Valence Language Runtime & Toolchain"
 
+# Library definition (exports lexer, parser, evaluator)
+[lib]
+name = "valence"
+path = "src/lib.rs"
+
+# Binary 1: Maps src/bin/cor_main.rs to 'cor.exe'
 [[bin]]
 name = "cor"
-path = "src/cor_main.rs"
+path = "src/bin/cor_main.rs"
 
+# Binary 2: Maps src/bin/val_main.rs to 'val.exe'
 [[bin]]
 name = "val"
-path = "src/val_main.rs"
+path = "src/bin/val_main.rs"
 
 [dependencies]
 chrono = "0.4"
-ureq = "2.9"
+ureq = "2"

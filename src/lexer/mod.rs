@@ -1,108 +1,6 @@
-//! Lexer implementation for the Connect language.
-//!
-//! Converts raw source text into a stream of token values.
+pub mod token;
+pub use token::Token;
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Token {
-    // Keywords
-    VarL,
-    VarG,
-    Summon,
-    Update,
-    Print,
-    Check,
-    OrCheck,
-    Else,
-    Circle,
-    Shatter,
-    Skip,
-    Func,
-    Callable,
-    Auto,
-    Forever,
-    Reply,
-    Trigger,
-    Rest,
-    Guard,
-    Wait,
-    True,
-    False,
-    Use,
-    When,
-    Every,
-    And,
-    Or,
-    Not,
-    Const,
-    Input,
-    Type,
-    ToInt,
-    ToFloat,
-    ToString,
-    ToBool,
-    Math,
-    File,
-
-    // Literals
-    Integer(i64),
-    Float(f64),
-    StringLit(String),
-    Null,
-
-    // Operators
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    Percent,
-    DoubleStar,
-    Equals,
-    TripleEquals,
-    EqualEqual,
-    NotEqual,
-    Greater,
-    Less,
-    GreaterEqual,
-    LessEqual,
-
-    // Delimiters
-    LParen,
-    RParen,
-    LBrace,
-    RBrace,
-    LBracket,
-    RBracket,
-    Comma,
-    Colon,
-    Pipe,
-    Dot,
-
-    // Special
-    Newline,
-    EOF,
-
-    // Identifier
-    Ident(String),
-
-    //Error Handling
-    Attempt,
-    Rescue,
-    Always,
-
-    //Backend
-    Json,
-    Date,
-    System,
-    Http,
-    Crypto,
-    Async,
-    Protect,
-}
-
-/// Lexer state for scanning source text.
-///
-/// `source` is stored as chars, `pos` tracks the current reading index,
-/// and `line` is used for diagnostics.
 pub struct Lexer {
     source: Vec<char>,
     pos: usize,
@@ -144,9 +42,7 @@ impl Lexer {
 
     fn skip_comment(&mut self) {
         while let Some(ch) = self.peek() {
-            if ch == '\n' {
-                break;
-            }
+            if ch == '\n' { break; }
             self.advance();
         }
     }
@@ -158,9 +54,7 @@ impl Lexer {
                 self.advance();
                 break;
             }
-            if self.peek() == Some('\n') {
-                self.line += 1;
-            }
+            if self.peek() == Some('\n') { self.line += 1; }
             self.advance();
         }
     }
@@ -173,7 +67,7 @@ impl Lexer {
             if ch.is_ascii_digit() {
                 num_str.push(ch);
                 self.advance();
-            } else if ch == '.' && !is_float {
+            } else if ch == '.' && !is_float && self.peek_next().map_or(false, |c| c.is_ascii_digit()) {
                 is_float = true;
                 num_str.push(ch);
                 self.advance();
@@ -190,11 +84,11 @@ impl Lexer {
     }
 
     fn read_string(&mut self) -> Token {
-        self.advance();
+        let quote = self.advance().unwrap();
         let mut result = String::new();
 
         while let Some(ch) = self.peek() {
-            if ch == '\'' {
+            if ch == quote {
                 self.advance();
                 break;
             }
@@ -207,51 +101,14 @@ impl Lexer {
                         'r' => result.push('\r'),
                         '\\' => result.push('\\'),
                         '\'' => result.push('\''),
-                        other => {
-                            result.push('\\');
-                            result.push(other);
-                        }
-                    }
-                    self.advance();
-                }
-            } else {
-                result.push(ch);
-                self.advance();
-            }
-        }
-
-        Token::StringLit(result)
-    }
-
-    fn read_template_string(&mut self) -> Token {
-        self.advance();
-        let mut result = String::new();
-
-        while let Some(ch) = self.peek() {
-            if ch == '`' {
-                self.advance();
-                break;
-            }
-            if ch == '\\' {
-                self.advance();
-                if let Some(next) = self.peek() {
-                    match next {
-                        'n' => result.push('\n'),
-                        't' => result.push('\t'),
-                        'r' => result.push('\r'),
-                        '\\' => result.push('\\'),
+                        '"' => result.push('"'),
                         '`' => result.push('`'),
-                        other => {
-                            result.push('\\');
-                            result.push(other);
-                        }
+                        other => { result.push('\\'); result.push(other); }
                     }
                     self.advance();
                 }
             } else {
-                if ch == '\n' {
-                    self.line += 1;
-                }
+                if ch == '\n' { self.line += 1; }
                 result.push(ch);
                 self.advance();
             }
@@ -324,7 +181,6 @@ impl Lexer {
         }
     }
 
-    /// Return the next token from the source, skipping whitespace and comments.
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
@@ -351,9 +207,7 @@ impl Lexer {
 
             Some(ch) if ch.is_ascii_digit() => self.read_number(),
 
-            Some('\'') => self.read_string(),
-
-            Some('`') => self.read_template_string(),
+            Some('\'') | Some('"') | Some('`') => self.read_string(),
 
             Some(ch) if ch.is_alphabetic() || ch == '_' => self.read_ident(),
 
@@ -446,19 +300,14 @@ impl Lexer {
         }
     }
 
-    /// Scan the entire source into a token vector.
     pub fn tokenize(&mut self) -> Vec<Token> {
         let mut tokens = Vec::new();
-
         loop {
             let token = self.next_token();
             let is_eof = token == Token::EOF;
             tokens.push(token);
-            if is_eof {
-                break;
-            }
+            if is_eof { break; }
         }
-
         tokens
     }
 }
