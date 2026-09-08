@@ -47,7 +47,9 @@ impl Evaluator {
         let count_val = self.eval(count);
         let times = match count_val { Value::Integer(n) => n, _ => return Value::Null };
         for i in 0..times {
-            self.local_vars.insert(name.clone(), Value::Integer(i));
+            if let Ok(mut env) = self.locals.write() {
+                env.define(name.clone(), Value::Integer(i));
+            }
             let mut break_loop = false;
             for node in body.clone() {
                 let result = self.eval(node);
@@ -69,7 +71,7 @@ impl Evaluator {
             for statement in body {
                 let result = self.eval(statement);
                 if let Value::Break = result {
-                    return Value::Boolean(true); // guard shatter returns true
+                    return Value::Boolean(true);
                 }
             }
         }
@@ -98,7 +100,9 @@ impl Evaluator {
         if error_occurred {
             if let Some(rbody) = rescue_body {
                 if let Some(param_name) = rescue_param {
-                    self.local_vars.insert(param_name, Value::StringVal(error_message));
+                    if let Ok(mut env) = self.locals.write() {
+                        env.define(param_name, Value::StringVal(error_message));
+                    }
                 }
                 for node in rbody {
                     self.eval(node);
@@ -115,20 +119,25 @@ impl Evaluator {
 
     pub fn eval_protect(&mut self, vars: Vec<String>, body: Vec<Node>) -> Value {
         let to_protect: Vec<String> = if vars.is_empty() {
-            self.local_vars.keys().cloned()
-                .chain(self.global_vars.keys().cloned())
-                .chain(self.constants.keys().cloned())
-                .collect()
+            let local_names = self.locals.read().unwrap().vars.keys().cloned().collect::<Vec<_>>();
+            let global_names = self.globals.read().unwrap().vars.keys().cloned().collect::<Vec<_>>();
+            let constant_names = self.constants.read().unwrap().keys().cloned().collect::<Vec<_>>();
+            local_names.into_iter().chain(global_names).chain(constant_names).collect()
         } else {
             vars
         };
+
         let mut newly_protected = Vec::new();
-        for v in &to_protect {
-            if !self.protected_vars.contains(v) {
-                self.protected_vars.insert(v.clone());
-                newly_protected.push(v.clone());
+        {
+            let mut protected = self.protected.write().unwrap();
+            for v in &to_protect {
+                if !protected.contains(v) {
+                    protected.insert(v.clone());
+                    newly_protected.push(v.clone());
+                }
             }
         }
+
         let mut result = Value::Null;
         for statement in body {
             result = self.eval(statement);
@@ -136,8 +145,12 @@ impl Evaluator {
                 break;
             }
         }
-        for v in &newly_protected {
-            self.protected_vars.remove(v);
+
+        {
+            let mut protected = self.protected.write().unwrap();
+            for v in &newly_protected {
+                protected.remove(v);
+            }
         }
         result
     }

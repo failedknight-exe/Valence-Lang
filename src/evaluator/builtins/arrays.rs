@@ -1,101 +1,160 @@
-use super::Evaluator;
+// src/evaluator/builtins/arrays.rs
 use crate::evaluator::value::Value;
+use crate::evaluator::Evaluator;
 use crate::parser::Node;
 
 impl Evaluator {
-    pub fn eval_array_method(&mut self, object: &str, method: &str, elements: &[Value], args: Vec<Node>) -> Value {
+    pub fn eval_array_method(
+        &mut self,
+        object: &str,
+        method: &str,
+        args: Vec<Node>,
+    ) -> Value {
+        let arr_val = self.lookup(object);
+        let arr = match arr_val {
+            Value::Array(a) => a,
+            Value::Error(e) => return Value::Error(e),
+            _ => return Value::Error(format!("'{object}' is not an array.")),
+        };
+
         match method {
-            "len" => Value::Integer(elements.len() as i64),
-            "first" => if elements.is_empty() { Value::Null } else { elements[0].clone() },
-            "last" => if elements.is_empty() { Value::Null } else { elements[elements.len() - 1].clone() },
-            "isEmpty" => Value::Boolean(elements.is_empty()),
+            "len" => {
+                let v = arr.read().unwrap();
+                Value::Integer(v.len() as i64)
+            }
+            "first" => {
+                let v = arr.read().unwrap();
+                v.first().cloned().unwrap_or(Value::Null)
+            }
+            "last" => {
+                let v = arr.read().unwrap();
+                v.last().cloned().unwrap_or(Value::Null)
+            }
+            "isEmpty" => {
+                let v = arr.read().unwrap();
+                Value::Boolean(v.is_empty())
+            }
             "has" => {
-                if args.is_empty() { return Value::Null; }
-                let check = self.eval(args[0].clone());
-                Value::Boolean(elements.contains(&check))
+                if args.is_empty() {
+                    return Value::Null;
+                }
+                let target = self.eval(args[0].clone());
+                let v = arr.read().unwrap();
+                Value::Boolean(v.iter().any(|x| *x == target))
             }
             "indexOf" => {
-                if args.is_empty() { return Value::Integer(-1); }
-                let search = self.eval(args[0].clone());
-                for (i, el) in elements.iter().enumerate() {
-                    if *el == search { return Value::Integer(i as i64); }
+                if args.is_empty() {
+                    return Value::Integer(-1);
+                }
+                let target = self.eval(args[0].clone());
+                let v = arr.read().unwrap();
+                for (i, x) in v.iter().enumerate() {
+                    if *x == target {
+                        return Value::Integer(i as i64);
+                    }
                 }
                 Value::Integer(-1)
             }
             "join" => {
-                let sep = if args.is_empty() { "".to_string() }
-                    else { match self.eval(args[0].clone()) { Value::StringVal(s) => s, _ => "".to_string() } };
-                let joined: Vec<String> = elements.iter().map(|v| format!("{}", v)).collect();
-                Value::StringVal(joined.join(&sep))
+                let sep = if args.is_empty() {
+                    "".to_string()
+                } else {
+                    match self.eval(args[0].clone()) {
+                        Value::StringVal(s) => s,
+                        other => other.to_string(),
+                    }
+                };
+                let v = arr.read().unwrap();
+                let s = v.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(&sep);
+                Value::StringVal(s)
             }
             "slice" => {
-                if args.len() < 2 { return Value::Null; }
-                let start = match self.eval(args[0].clone()) { Value::Integer(i) => i as usize, _ => 0 };
-                let end = match self.eval(args[1].clone()) { Value::Integer(i) => i as usize, _ => elements.len() };
-                if start > end || end > elements.len() { return Value::Array(Vec::new()); }
-                Value::Array(elements[start..end].to_vec())
+                if args.len() < 2 {
+                    return Value::Null;
+                }
+                let start = match self.eval(args[0].clone()) {
+                    Value::Integer(i) if i >= 0 => i as usize,
+                    _ => 0,
+                };
+                let end = match self.eval(args[1].clone()) {
+                    Value::Integer(i) if i >= 0 => i as usize,
+                    _ => {
+                        let v = arr.read().unwrap();
+                        v.len()
+                    }
+                };
+                let v = arr.read().unwrap();
+                if start > end || end > v.len() {
+                    return Value::array(vec![]);
+                }
+                Value::array(v[start..end].to_vec())
             }
+
+            // ===== MUTATIONS (shared handle) =====
             "push" => {
-                if args.is_empty() { return Value::Null; }
+                if args.is_empty() {
+                    return Value::Null;
+                }
                 let new_val = self.eval(args[0].clone());
-                let mut new_arr = elements.to_vec();
-                new_arr.push(new_val);
-                let new_array = Value::Array(new_arr);
-                if self.local_vars.contains_key(object) { self.local_vars.insert(object.to_string(), new_array.clone()); }
-                else { self.global_vars.insert(object.to_string(), new_array.clone()); }
-                new_array
+                {
+                    let mut v = arr.write().unwrap();
+                    v.push(new_val);
+                }
+                Value::Array(arr) // same handle
             }
             "pop" => {
-                let mut new_arr = elements.to_vec();
-                let popped = if new_arr.is_empty() { Value::Null } else { new_arr.pop().unwrap_or(Value::Null) };
-                let new_array = Value::Array(new_arr);
-                if self.local_vars.contains_key(object) { self.local_vars.insert(object.to_string(), new_array); }
-                else { self.global_vars.insert(object.to_string(), new_array); }
-                popped
+                let mut v = arr.write().unwrap();
+                v.pop().unwrap_or(Value::Null)
             }
             "reverse" => {
-                let mut new_arr = elements.to_vec();
-                new_arr.reverse();
-                let new_array = Value::Array(new_arr);
-                if self.local_vars.contains_key(object) { self.local_vars.insert(object.to_string(), new_array.clone()); }
-                else { self.global_vars.insert(object.to_string(), new_array.clone()); }
-                new_array
+                {
+                    let mut v = arr.write().unwrap();
+                    v.reverse();
+                }
+                Value::Array(arr)
             }
             "sort" => {
-                let mut new_arr = elements.to_vec();
-                new_arr.sort_by(|a, b| match (a, b) {
-                    (Value::Integer(x), Value::Integer(y)) => x.cmp(y),
-                    (Value::Float(x), Value::Float(y)) => x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal),
-                    (Value::StringVal(x), Value::StringVal(y)) => x.cmp(y),
-                    _ => std::cmp::Ordering::Equal,
-                });
-                let new_array = Value::Array(new_arr);
-                if self.local_vars.contains_key(object) { self.local_vars.insert(object.to_string(), new_array.clone()); }
-                else { self.global_vars.insert(object.to_string(), new_array.clone()); }
-                new_array
+                {
+                    let mut v = arr.write().unwrap();
+                    v.sort_by(|a, b| match (a, b) {
+                        (Value::Integer(x), Value::Integer(y)) => x.cmp(y),
+                        (Value::Float(x), Value::Float(y)) => {
+                            x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal)
+                        }
+                        (Value::StringVal(x), Value::StringVal(y)) => x.cmp(y),
+                        _ => std::cmp::Ordering::Equal,
+                    });
+                }
+                Value::Array(arr)
             }
             "clear" => {
-                let empty = Value::Array(Vec::new());
-                if self.local_vars.contains_key(object) { self.local_vars.insert(object.to_string(), empty.clone()); }
-                else { self.global_vars.insert(object.to_string(), empty.clone()); }
-                empty
+                {
+                    let mut v = arr.write().unwrap();
+                    v.clear();
+                }
+                Value::Array(arr)
             }
-            _ => Value::Null,
+            _ => Value::Error(format!("Unknown array method '{method}'.")),
         }
     }
 
     pub fn eval_index_access(&mut self, name: String, index: Node) -> Value {
-        let idx = match self.eval(index) { Value::Integer(i) => i as usize, _ => return Value::Null };
-        let arr = if let Some(val) = self.local_vars.get(&name) { val.clone() }
-            else if let Some(val) = self.global_vars.get(&name) { val.clone() }
-            else if let Some(val) = self.constants.get(&name) { val.clone() }
-            else { return Value::Error(format!("'{}' was never declared", name)); };
-        match arr {
-            Value::Array(elements) => {
-                if idx < elements.len() { elements[idx].clone() }
-                else { Value::Error(format!("Index [{}] out of bounds.", idx)) }
+        let idx = match self.eval(index) {
+            Value::Integer(i) if i >= 0 => i as usize,
+            _ => return Value::Error("Index must be non-negative integer.".into()),
+        };
+
+        match self.lookup(&name) {
+            Value::Array(arr) => {
+                let v = arr.read().unwrap();
+                if idx < v.len() {
+                    v[idx].clone()
+                } else {
+                    Value::Error(format!("Index [{idx}] out of bounds."))
+                }
             }
-            _ => Value::Error(format!("'{}' is not an array.", name)),
+            Value::Error(e) => Value::Error(e),
+            _ => Value::Error(format!("'{name}' is not an array.")),
         }
     }
 }

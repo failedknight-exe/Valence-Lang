@@ -10,7 +10,9 @@ impl Evaluator {
                 let val = self.eval(args[0].clone());
                 match val {
                     Value::Map(ref map) => {
-                        let pairs: Vec<String> = map.iter()
+                        let guard = map.read().unwrap();
+                        let pairs: Vec<String> = guard
+                            .iter()
                             .map(|(k, v)| {
                                 let val_str = match v {
                                     Value::StringVal(s) => format!("\"{}\"", s),
@@ -26,7 +28,9 @@ impl Evaluator {
                         Value::StringVal(format!("{{{}}}", pairs.join(",")))
                     }
                     Value::Array(ref arr) => {
-                        let items: Vec<String> = arr.iter()
+                        let guard = arr.read().unwrap();
+                        let items: Vec<String> = guard
+                            .iter()
                             .map(|v| match v {
                                 Value::StringVal(s) => format!("\"{}\"", s),
                                 other => format!("{}", other),
@@ -70,7 +74,7 @@ impl Evaluator {
                             map.insert(key, val);
                         }
                     }
-                    Value::Map(map)
+                    Value::map(map)
                 } else {
                     Value::Error("json.parse: invalid JSON structure format".to_string())
                 }

@@ -54,6 +54,16 @@ impl Parser {
             Token::Http   => self.parse_builtin_stmt("http"),
             Token::Crypto => self.parse_builtin_stmt("crypto"),
 
+            Token::Rewind => {
+                self.advance();
+                self.expect(&Token::LParen);
+                let count = self.parse_expression()?;
+                self.expect(&Token::RParen);
+                Some(Node::Rewind(Box::new(count)))
+            }
+
+            Token::Db => self.parse_builtin_stmt("db"),
+
             _ => {
                 println!("[PARSE ERROR] Unexpected token: {:?}", self.peek());
                 self.advance();
@@ -432,6 +442,7 @@ impl Parser {
             "system" => Some(Node::SystemCall { method, args }),
             "http"   => Some(Node::HttpCall { method, args }),
             "crypto" => Some(Node::CryptoCall { method, args }),
+            "db"     => Some(Node::DbCall { method, args }),
             _ => None,
         }
     }

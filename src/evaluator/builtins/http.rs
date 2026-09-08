@@ -136,7 +136,7 @@ impl Evaluator {
                                         map.insert(key, value);
                                     }
                                 }
-                                Value::Map(map)
+                                Value::map(map)
                             } else {
                                 Value::StringVal(body)
                             }
@@ -156,8 +156,9 @@ impl Evaluator {
                     Value::Map(m) => m,
                     _ => return Value::Error("Headers must be a Map".to_string()),
                 };
+                let guard = headers.read().unwrap();
                 let mut req = ureq::get(&url);
-                for (k, v) in headers.iter() {
+                for (k, v) in guard.iter() {
                     req = req.set(k, &format!("{}", v));
                 }
                 match req.call() {
@@ -182,8 +183,9 @@ impl Evaluator {
                     Value::Map(m) => m,
                     _ => return Value::Error("Headers must be a Map".to_string()),
                 };
+                let guard = headers.read().unwrap();
                 let mut req = ureq::post(&url);
-                for (k, v) in headers.iter() {
+                for (k, v) in guard.iter() {
                     req = req.set(k, &format!("{}", v));
                 }
                 match req.send_string(&body) {

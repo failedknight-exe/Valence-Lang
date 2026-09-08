@@ -1,62 +1,91 @@
-use super::Evaluator;
+// src/evaluator/builtins/maps.rs
 use crate::evaluator::value::Value;
+use crate::evaluator::Evaluator;
 use crate::parser::Node;
 use std::collections::HashMap;
 
 impl Evaluator {
-    pub fn eval_map_method(&mut self, object: &str, method: &str, map: &HashMap<String, Value>, args: Vec<Node>) -> Value {
+    pub fn eval_map_method(
+        &mut self,
+        object: &str,
+        method: &str,
+        args: Vec<Node>,
+    ) -> Value {
+        let map_val = self.lookup(object);
+        let map = match map_val {
+            Value::Map(m) => m,
+            Value::Error(e) => return Value::Error(e),
+            _ => return Value::Error(format!("'{object}' is not a map.")),
+        };
+
         match method {
             "keys" => {
-                let k: Vec<Value> = map.keys().map(|key| Value::StringVal(key.clone())).collect();
-                Value::Array(k)
+                let m = map.read().unwrap();
+                let keys = m
+                    .keys()
+                    .map(|k| Value::StringVal(k.clone()))
+                    .collect::<Vec<_>>();
+                Value::array(keys)
             }
             "values" => {
-                let v: Vec<Value> = map.values().cloned().collect();
-                Value::Array(v)
+                let m = map.read().unwrap();
+                let values = m.values().cloned().collect::<Vec<_>>();
+                Value::array(values)
             }
-            "size" => Value::Integer(map.len() as i64),
+            "size" => {
+                let m = map.read().unwrap();
+                Value::Integer(m.len() as i64)
+            }
             "has" => {
-                if args.is_empty() { return Value::Null; }
+                if args.is_empty() {
+                    return Value::Boolean(false);
+                }
                 let key = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
-                    _ => return Value::Boolean(false),
+                    other => other.to_string(),
                 };
-                Value::Boolean(map.contains_key(&key))
+                let m = map.read().unwrap();
+                Value::Boolean(m.contains_key(&key))
             }
             "get" => {
-                if args.is_empty() { return Value::Null; }
+                if args.is_empty() {
+                    return Value::Null;
+                }
                 let key = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
-                    _ => return Value::Null,
+                    other => other.to_string(),
                 };
-                map.get(&key).cloned().unwrap_or(Value::Null)
+                let m = map.read().unwrap();
+                m.get(&key).cloned().unwrap_or(Value::Null)
             }
             "delete" => {
-                if args.is_empty() { return Value::Null; }
+                if args.is_empty() {
+                    return Value::Null;
+                }
                 let key = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
-                    _ => return Value::Null,
+                    other => other.to_string(),
                 };
-                let mut new_map = map.clone();
-                new_map.remove(&key);
-                let result = Value::Map(new_map);
-                if self.local_vars.contains_key(object) {
-                    self.local_vars.insert(object.to_string(), result.clone());
-                } else if self.global_vars.contains_key(object) {
-                    self.global_vars.insert(object.to_string(), result.clone());
+                {
+                    let mut m = map.write().unwrap();
+                    m.remove(&key);
                 }
-                result
+                Value::Map(map) // same handle
             }
-            _ => map.get(method).cloned().unwrap_or(Value::Null),
+            // field-style fallback: user.config
+            other => {
+                let m = map.read().unwrap();
+                m.get(other).cloned().unwrap_or(Value::Null)
+            }
         }
     }
 
     pub fn eval_map_lit(&mut self, keys: Vec<String>, values: Vec<Box<Node>>) -> Value {
         let mut map = HashMap::new();
-        for (i, key) in keys.iter().enumerate() {
-            let val = self.eval(*values[i].clone());
-            map.insert(key.clone(), val);
+        for (i, k) in keys.into_iter().enumerate() {
+            let v = self.eval(*values[i].clone());
+            map.insert(k, v);
         }
-        Value::Map(map)
+        Value::map(map)
     }
 }

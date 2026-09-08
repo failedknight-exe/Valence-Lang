@@ -51,7 +51,7 @@ impl Evaluator {
             }
             "args" => {
                 let args_vec: Vec<Value> = std::env::args().skip(1).map(Value::StringVal).collect();
-                Value::Array(args_vec)
+                Value::array(args_vec)
             }
             _ => Value::Error(format!("'{}' is not a valid system method", method)),
         }

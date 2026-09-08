@@ -36,5 +36,5 @@ pub enum Token {
     Attempt, Rescue, Always,
 
     // Backend
-    Json, Date, System, Http, Crypto, Async, Protect,
+    Json, Date, System, Http, Crypto, Async, Protect, Rewind, Db,
 }

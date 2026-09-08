@@ -228,6 +228,7 @@ impl Parser {
             Token::System => self.parse_builtin_expr("system"),
             Token::Http => self.parse_builtin_expr("http"),
             Token::Crypto => self.parse_builtin_expr("crypto"),
+            Token::Db => self.parse_builtin_expr("db"),
 
             Token::Ident(name) => {
                 if self.peek() == &Token::LParen {
@@ -310,6 +311,7 @@ impl Parser {
             "system" => Some(Node::SystemCall { method, args }),
             "http"   => Some(Node::HttpCall { method, args }),
             "crypto" => Some(Node::CryptoCall { method, args }),
+            "db"     => Some(Node::DbCall { method, args }),
             _ => None,
         }
     }

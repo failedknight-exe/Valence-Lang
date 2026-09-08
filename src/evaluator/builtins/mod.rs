@@ -1,7 +1,7 @@
-pub mod math;
-pub mod strings;
 pub mod arrays;
 pub mod maps;
+pub mod strings;
+pub mod math;
 pub mod file_io;
 pub mod http;
 pub mod json;
@@ -10,6 +10,7 @@ pub mod date;
 pub mod system;
 pub mod conversion;
 pub mod io;
+pub mod db;
 
 use super::Evaluator;
 use super::value::Value;
@@ -17,22 +18,27 @@ use crate::parser::Node;
 
 impl Evaluator {
     pub fn eval_method_call(&mut self, object: String, method: String, args: Vec<Node>) -> Value {
-        if self.constants.contains_key(&object) {
+        if self.constants.read().unwrap().contains_key(&object) {
             let muts = ["push", "pop", "reverse", "sort", "clear", "delete"];
             if muts.contains(&method.as_str()) {
                 return Value::Error(format!("Cannot call mutating method '{}' on constant '{}'", method, object));
             }
         }
 
-        let val = if let Some(v) = self.local_vars.get(&object) { v.clone() }
-            else if let Some(v) = self.global_vars.get(&object) { v.clone() }
-            else if let Some(v) = self.constants.get(&object) { v.clone() }
-            else { return Value::Error(format!("'{}' was never declared", object)); };
+        let val = if let Some(v) = self.locals.read().unwrap().get(&object) {
+            v
+        } else if let Some(v) = self.globals.read().unwrap().get(&object) {
+            v
+        } else if let Some(v) = self.constants.read().unwrap().get(&object).cloned() {
+            v
+        } else {
+            return Value::Error(format!("'{}' was never declared", object));
+        };
 
         match val {
-            Value::Array(elements) => self.eval_array_method(&object, &method, &elements, args),
+            Value::Array(_) => self.eval_array_method(&object, &method, args),
             Value::StringVal(s) => self.eval_string_method(&object, &method, &s, args),
-            Value::Map(map) => self.eval_map_method(&object, &method, &map, args),
+            Value::Map(_) => self.eval_map_method(&object, &method, args),
             _ => Value::Null,
         }
     }

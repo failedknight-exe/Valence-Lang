@@ -177,6 +177,8 @@ impl Lexer {
             "crypto"   => Token::Crypto,
             "async"    => Token::Async,
             "protect"  => Token::Protect,
+            "rewind"   => Token::Rewind,
+            "db"       => Token::Db,
             _          => Token::Ident(ident),
         }
     }

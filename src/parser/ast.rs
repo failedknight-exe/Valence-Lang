@@ -58,4 +58,6 @@ pub enum Node {
     CryptoCall { method: String, args: Vec<Node> },
     AsyncBlock { body: Vec<Node> },
     Protect { vars: Vec<String>, body: Vec<Node> },
+    Rewind(Box<Node>),
+    DbCall { method: String, args: Vec<Node> },
 }

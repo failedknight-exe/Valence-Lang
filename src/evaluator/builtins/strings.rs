@@ -36,7 +36,7 @@ impl Evaluator {
                 let sep = self.eval(args[0].clone());
                 if let Value::StringVal(separator) = sep {
                     let parts: Vec<Value> = s.split(&separator).map(|p| Value::StringVal(p.to_string())).collect();
-                    Value::Array(parts)
+                    Value::array(parts)
                 } else { Value::Null }
             }
             "slice" => {
