@@ -1,4 +1,7 @@
-// src/evaluator/builtins/db.rs - Native Zero-Config Database Module
+//! Small process-wide key/value database used by the `db.*` builtins.
+//!
+//! The active file and in-memory map are shared by all evaluators. Writes flush
+//! immediately so a later evaluator or process can observe completed updates.
 
 use super::Evaluator;
 use crate::evaluator::value::Value;
@@ -21,7 +24,7 @@ impl DatabaseEngine {
     }
 }
 
-// Global DB instance
+// One database is shared across evaluator instances in this process.
 static DB_INSTANCE: std::sync::OnceLock<Arc<RwLock<DatabaseEngine>>> = std::sync::OnceLock::new();
 
 fn get_db() -> &'static Arc<RwLock<DatabaseEngine>> {
@@ -35,17 +38,18 @@ impl Evaluator {
         match method {
             "open" => {
     if args.is_empty() {
-        return Value::Error("db.open() expects a file path".into());
+        return Value::Error("db.open() expects a file path. A database without a file is just an expensive daydream.".into());
     }
     let path = match self.eval(args[0].clone()) {
         Value::StringVal(s) => s,
-        _ => return Value::Error("Database path must be a string".into()),
+        _ => return Value::Error("Database path must be a string. A number is not a file path, and a file path is not a personality.".into()),
     };
 
     let mut db = db_arc.write().unwrap();
     db.current_path = Some(path.clone());
 
-    // 💡 TOUCH / CREATE FILE ON DISK IMMEDIATELY IF NEW!
+    // Create the file during open so a successful open has a durable path even
+    // before the first key is written.
     if !std::path::Path::new(&path).exists() {
         let _ = fs::write(&path, "");
     } else if let Ok(content) = fs::read_to_string(&path) {
@@ -63,7 +67,7 @@ impl Evaluator {
 
             "set" => {
                 if args.len() < 2 {
-                    return Value::Error("db.set() requires key and value".into());
+                    return Value::Error("db.set() requires key and value. You can't store a mood without a name and a payload.".into());
                 }
                 let key = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
@@ -74,7 +78,8 @@ impl Evaluator {
                 let mut db = db_arc.write().unwrap();
                 db.store.insert(key, val.to_string());
 
-                // Auto-flush to disk if path is open!
+                // Persist the complete map after each write. The format is simple
+                // key=value lines, matching the loader above.
                 if let Some(path) = &db.current_path {
                     let mut content = String::new();
                     for (k, v) in &db.store {
@@ -133,7 +138,7 @@ impl Evaluator {
                 Value::Boolean(existed)
             }
 
-            _ => Value::Error(format!("Unknown db method '{method}'.")),
+            _ => Value::Error(format!("Unknown db method '{method}'. That's not a database action; that's a cry for help.")),
         }
     }
 }

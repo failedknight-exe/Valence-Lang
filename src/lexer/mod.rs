@@ -1,3 +1,8 @@
+//! Converts Connect source text into parser tokens while tracking line numbers.
+//!
+//! Comments are discarded before token emission. Newlines remain visible because
+//! the parser uses them as separators when recovering from malformed statements.
+
 pub mod token;
 pub use token::Token;
 
@@ -179,6 +184,13 @@ impl Lexer {
             "protect"  => Token::Protect,
             "rewind"   => Token::Rewind,
             "db"       => Token::Db,
+            "judge"    => Token::Judge,
+            "paint"    => Token::Paint,
+            "bond"     => Token::Bond,
+            "as"       => Token::As,
+            "vbp"      => Token::Vbp,
+            "vault"    => Token::Vault,
+            "weave"    => Token::Weave,
             _          => Token::Ident(ident),
         }
     }
@@ -250,19 +262,22 @@ impl Lexer {
             Some('/') => { self.advance(); Token::Slash }
 
             Some('=') => {
-                self.advance();
-                if self.peek() == Some('=') {
-                    self.advance();
-                    if self.peek() == Some('=') {
-                        self.advance();
-                        Token::TripleEquals
-                    } else {
-                        Token::EqualEqual
-                    }
-                } else {
-                    Token::Equals
-                }
-            }
+    self.advance();
+    if self.peek() == Some('>') {
+        self.advance();
+            Token::FatArrow
+    } else if self.peek() == Some('=') {
+        self.advance();
+        if self.peek() == Some('=') {
+            self.advance();
+            Token::TripleEquals
+        } else {
+            Token::EqualEqual
+        }
+    } else {
+        Token::Equals
+    }
+}
 
             Some('!') => {
                 self.advance();

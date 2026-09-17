@@ -30,7 +30,7 @@ impl Evaluator {
                 };
                 match output {
                     Ok(out) => Value::StringVal(String::from_utf8_lossy(&out.stdout).to_string()),
-                    Err(e) => Value::Error(format!("exec failed: {}", e)),
+                    Err(e) => Value::Error(format!("exec failed: {}. The shell just folded under pressure and took the easy way out.", e)),
                 }
             }
             "cwd" => match std::env::current_dir() {
@@ -53,7 +53,7 @@ impl Evaluator {
                 let args_vec: Vec<Value> = std::env::args().skip(1).map(Value::StringVal).collect();
                 Value::array(args_vec)
             }
-            _ => Value::Error(format!("'{}' is not a valid system method", method)),
+            _ => Value::Error(format!("'{}' is not a valid system method. That command is less useful than a flashlight in a blackout.", method)),
         }
     }
 }

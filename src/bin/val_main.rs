@@ -1,6 +1,4 @@
-// val_main.rs
-// Valence Library & Helper
-// Sirius Zenith Labs
+//! Project helper for creating and managing Valence workspaces.
 
 use std::env;
 use std::fs;
@@ -30,10 +28,8 @@ fn main() {
             fs::create_dir_all(format!("{}/.valAI", project_name)).unwrap();
 
             let bridge_content = format!(
-r#"// {} — Valence Core File
+r#"// Entry point for the {0} project.
 // Run with: cor run src/bridge.cor
-
-// Start coding here!
 "#, project_name);
 
             fs::write(format!("{}/src/bridge.cor", project_name), bridge_content).unwrap();

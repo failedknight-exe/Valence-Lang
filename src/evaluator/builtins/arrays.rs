@@ -1,4 +1,4 @@
-// src/evaluator/builtins/arrays.rs
+//! Methods for reading and mutating evaluator arrays.
 use crate::evaluator::value::Value;
 use crate::evaluator::Evaluator;
 use crate::parser::Node;
@@ -14,7 +14,7 @@ impl Evaluator {
         let arr = match arr_val {
             Value::Array(a) => a,
             Value::Error(e) => return Value::Error(e),
-            _ => return Value::Error(format!("'{object}' is not an array.")),
+            _ => return Value::Error(format!("Nice try, but '{object}' is not an array. That's not a collection; that's just a dramatic variable.")),
         };
 
         match method {
@@ -90,7 +90,8 @@ impl Evaluator {
                 Value::array(v[start..end].to_vec())
             }
 
-            // ===== MUTATIONS (shared handle) =====
+            // Mutating methods operate on the shared handle and return that same
+            // handle where the language exposes the array as an expression.
             "push" => {
                 if args.is_empty() {
                     return Value::Null;
@@ -100,7 +101,7 @@ impl Evaluator {
                     let mut v = arr.write().unwrap();
                     v.push(new_val);
                 }
-                Value::Array(arr) // same handle
+                Value::Array(arr)
             }
             "pop" => {
                 let mut v = arr.write().unwrap();
@@ -134,14 +135,14 @@ impl Evaluator {
                 }
                 Value::Array(arr)
             }
-            _ => Value::Error(format!("Unknown array method '{method}'.")),
+            _ => Value::Error(format!("'{method}' is not a real array method. Even a toaster has better ideas.")),
         }
     }
 
     pub fn eval_index_access(&mut self, name: String, index: Node) -> Value {
         let idx = match self.eval(index) {
             Value::Integer(i) if i >= 0 => i as usize,
-            _ => return Value::Error("Index must be non-negative integer.".into()),
+            _ => return Value::Error("Index needs to be a non-negative integer. Negative indexes are chaos, not code.".into()),
         };
 
         match self.lookup(&name) {
@@ -150,11 +151,11 @@ impl Evaluator {
                 if idx < v.len() {
                     v[idx].clone()
                 } else {
-                    Value::Error(format!("Index [{idx}] out of bounds."))
+                    Value::Error(format!("Index [{idx}] is so far out of bounds it needs a map and a prayer."))
                 }
             }
             Value::Error(e) => Value::Error(e),
-            _ => Value::Error(format!("'{name}' is not an array.")),
+            _ => Value::Error(format!("'{name}' is not an array. That's not a list; that's just vibes.")),
         }
     }
 }

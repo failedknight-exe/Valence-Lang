@@ -1,3 +1,8 @@
+//! Token cursor and top-level statement parsing utilities.
+//!
+//! Cursor methods skip newlines for ordinary lookahead, allowing expressions and
+//! statements to span lines without making whitespace part of their grammar.
+
 pub mod ast;
 pub mod expressions;
 pub mod statements;

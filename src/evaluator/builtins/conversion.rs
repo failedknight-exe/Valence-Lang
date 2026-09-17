@@ -28,7 +28,7 @@ impl Evaluator {
             Value::Float(f) => Value::Integer(f as i64),
             Value::StringVal(s) => match s.parse::<i64>() {
                 Ok(n) => Value::Integer(n),
-                Err(_) => Value::Error(format!("Cannot convert '{}' to integer.", s)),
+                Err(_) => Value::Error(format!("Cannot convert '{}' to integer. That's not a number; that's a personality test.", s)),
             },
             Value::Boolean(b) => Value::Integer(if b { 1 } else { 0 }),
             _ => Value::Null,
@@ -42,7 +42,7 @@ impl Evaluator {
             Value::Integer(n) => Value::Float(n as f64),
             Value::StringVal(s) => match s.parse::<f64>() {
                 Ok(f) => Value::Float(f),
-                Err(_) => Value::Error(format!("Cannot convert '{}' to float.", s)),
+                Err(_) => Value::Error(format!("Cannot convert '{}' to float. This value is less stable than a cardboard bridge.", s)),
             },
             Value::Boolean(b) => Value::Float(if b { 1.0 } else { 0.0 }),
             _ => Value::Null,

@@ -45,7 +45,7 @@ impl Evaluator {
                 if args.is_empty() { return Value::Null; }
                 let text = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
-                    _ => return Value::Error("json.parse needs a string argument".to_string()),
+                    _ => return Value::Error("json.parse needs a string argument. A number is not JSON, and neither is a shrug.".to_string()),
                 };
                 let trimmed = text.trim();
                 if trimmed.starts_with('{') {
@@ -76,10 +76,10 @@ impl Evaluator {
                     }
                     Value::map(map)
                 } else {
-                    Value::Error("json.parse: invalid JSON structure format".to_string())
+                    Value::Error("json.parse: invalid JSON structure format. That payload is less structured than a toddler's toy box.".to_string())
                 }
             }
-            _ => Value::Error(format!("'{}' is not a valid json method", method)),
+            _ => Value::Error(format!("'{}' is not a valid json method. That's not JSON logic; that's just pretend programming.", method)),
         }
     }
 }

@@ -1,4 +1,4 @@
-// src/evaluator/value.rs
+//! Runtime values and the control-flow sentinels returned by evaluation.
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, RwLock};
@@ -13,11 +13,13 @@ pub enum Value {
     Boolean(bool),
     Null,
 
-    // shared heavy values (zero-copy)
+    // Containers are handles so assignment and function calls can share mutations
+    // without copying their contents.
     Array(Arc<RwLock<Vec<Value>>>),
     Map(Arc<RwLock<HashMap<String, Value>>>),
 
-    // control-flow sentinels
+    // These variants travel through nested evaluators until the owning construct
+    // consumes them (for example, a loop consumes Break).
     Return(Box<Value>),
     Break,
     Continue,

@@ -6,7 +6,7 @@ impl Evaluator {
     pub fn eval_crypto_builtin(&mut self, method: &str, args: Vec<Node>) -> Value {
         match method {
             "hash" => {
-                if args.is_empty() { return Value::Error("crypto.hash needs data payload".to_string()); }
+                if args.is_empty() { return Value::Error("crypto.hash needs data payload. You can't hash nothing and call it a strategy.".to_string()); }
                 let data = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
                     other => format!("{}", other),
@@ -107,7 +107,7 @@ impl Evaluator {
                 }
                 Value::StringVal(String::from_utf8_lossy(&output).to_string())
             }
-            _ => Value::Error(format!("'{}' is not a valid crypto method", method)),
+            _ => Value::Error(format!("'{}' is not a valid crypto method. Even the crypto gods would laugh at that one.", method)),
         }
     }
 }

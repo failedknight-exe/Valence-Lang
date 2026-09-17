@@ -15,16 +15,21 @@ impl Evaluator {
     }
 
     pub fn eval_input(&mut self, prompt: Node) -> Value {
-        let prompt_val = self.eval(prompt);
-        print!("{}", prompt_val);
-        let _ = io::stdout().flush();
-        let mut input = String::new();
-        let _ = io::stdin().read_line(&mut input);
-        let input = input.trim().to_string();
-        if let Ok(n) = input.parse::<i64>() { return Value::Integer(n); }
-        if let Ok(f) = input.parse::<f64>() { return Value::Float(f); }
-        if input == "true" { return Value::Boolean(true); }
-        if input == "false" { return Value::Boolean(false); }
-        Value::StringVal(input)
+    let prompt_val = self.eval(prompt);
+    print!("{}", prompt_val);
+    let _ = io::stdout().flush();
+
+    let mut input = String::new();
+    match io::stdin().read_line(&mut input) {
+        Ok(0) => {
+            // EOF or empty read: return empty string, NEVER Break!
+            Value::StringVal(String::new())
+        }
+        Ok(_) => {
+            let clean = input.trim().to_string();
+            Value::StringVal(clean)
+        }
+        Err(_) => Value::StringVal(String::new()),
     }
+}
 }

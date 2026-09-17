@@ -1,4 +1,8 @@
-// src/evaluator/mod.rs
+//! Runtime state and AST evaluation for the Connect language.
+//!
+//! The evaluator keeps global state separate from the current local scope, while
+//! reference-counted locks allow arrays, maps, and shared runtime registries to
+//! survive function calls and evaluator forks.
 
 pub mod value;
 pub mod environment;
@@ -36,7 +40,7 @@ pub struct Evaluator {
     pub functions: Arc<RwLock<HashMap<String, StoredFunc>>>,
     pub protected: Arc<RwLock<HashSet<String>>>,
     pub when_triggers: Arc<RwLock<Vec<(String, Node, bool)>>>,
-    pub history: Arc<RwLock<Vec<UndoRecord>>>, // 👈 TIME-TRAVEL HISTORY STACK!
+    pub history: Arc<RwLock<Vec<UndoRecord>>>,
 }
 
 impl Evaluator {
@@ -50,22 +54,24 @@ impl Evaluator {
             functions: Arc::new(RwLock::new(HashMap::new())),
             protected: Arc::new(RwLock::new(HashSet::new())),
             when_triggers: Arc::new(RwLock::new(Vec::new())),
-            history: Arc::new(RwLock::new(Vec::new())), // 👈 Init history stack!
+            // Each evaluator starts with an empty transaction log. Forks share
+            // this log so mutations made by asynchronous work remain undoable.
+            history: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
     pub fn fork(&self) -> Self {
-        let locals = Environment::child(self.globals.clone());
-        Self {
-            globals: self.globals.clone(),
-            locals,
-            constants: self.constants.clone(),
-            functions: self.functions.clone(),
-            protected: self.protected.clone(),
-            when_triggers: self.when_triggers.clone(),
-            history: self.history.clone(),
-        }
+    let locals = Environment::child(self.locals.clone());
+    Self {
+        globals: self.globals.clone(),
+        locals,
+        constants: self.constants.clone(),
+        functions: self.functions.clone(),
+        protected: self.protected.clone(),
+        when_triggers: self.when_triggers.clone(),
+        history: self.history.clone(),
     }
+}
 
     pub fn run(&mut self, nodes: Vec<Node>) {
         for n in nodes {
@@ -90,11 +96,15 @@ impl Evaluator {
         Value::Error(format!("'{name}' was never declared."))
     }
 
-    /// Rewinds state N steps back in time!
+    /// Restores up to `count` successful mutations in reverse chronological order.
+    ///
+    /// A missing previous value means the mutation created the variable, so rewind
+    /// removes it. Array entries store their previous value directly because the
+    /// array itself is a shared handle rather than a copied local binding.
     pub fn eval_rewind(&mut self, count_node: Node) -> Value {
         let count = match self.eval(count_node) {
             Value::Integer(n) if n > 0 => n as usize,
-            _ => return Value::Error("rewind() expects a positive integer".into()),
+            _ => return Value::Error("rewind() expects a positive integer. Zero or negative rewind values are not history; they're just denial.".into()),
         };
 
         let mut hist = self.history.write().unwrap();
@@ -144,16 +154,17 @@ impl Evaluator {
     fn eval_update(&mut self, name: String, value: Node) -> Value {
         if let Ok(p) = self.protected.read() {
             if p.contains(&name) {
-                return Value::Error(format!("Variable '{name}' is protected."));
+                return Value::Error(format!("Variable '{name}' is protected. That's not a mutation; that's a locked door with a bad attitude."));
             }
         }
         if let Ok(c) = self.constants.read() {
             if c.contains_key(&name) {
-                return Value::Error(format!("'{name}' is a constant. Cannot mutate."));
+                return Value::Error(format!("'{name}' is a constant. Cannot mutate. Constants don't change; they just sit there like a smug statue."));
             }
         }
 
-        // Record old value before mutating!
+        // Capture the value before evaluation changes the binding. `None` marks a
+        // newly created binding and lets rewind remove it instead of restoring it.
         let old_val = match self.lookup(&name) {
             Value::Error(_) => None,
             val => Some(val),
@@ -174,7 +185,8 @@ impl Evaluator {
         };
 
         if ok {
-            // Log undo step into history stack!
+            // Only successful assignments enter the log; failed evaluations must
+            // not make a later rewind undo an operation that never happened.
             if let Ok(mut h) = self.history.write() {
                 h.push(UndoRecord::VarUpdate {
                     name,
@@ -185,54 +197,124 @@ impl Evaluator {
             self.check_triggers();
             v
         } else {
-            Value::Error(format!("'{name}' was never declared."))
+            Value::Error(format!("'{name}' was never declared. That's not a variable; that's an imaginary friend with no references."))
         }
     }
+
+    pub fn eval_judge(
+    &mut self,
+    expr: Node,
+    cases: Vec<(Node, Node)>,
+    default_case: Option<Box<Node>>,
+) -> Value {
+    let target = self.eval(expr);
+
+    for (pattern_node, body_node) in cases {
+        let pattern_val = self.eval(pattern_node);
+
+        if target == pattern_val {
+            return self.eval(body_node);
+        }
+    }
+
+    if let Some(default_node) = default_case {
+        return self.eval(*default_node);
+    }
+
+    Value::Null
+}
 
     fn eval_update_index(&mut self, name: String, index: Node, value: Node) -> Value {
-        let idx = match self.eval(index) {
-            Value::Integer(i) if i >= 0 => i as usize,
-            _ => return Value::Error("Index must be non-negative integer.".into()),
-        };
-        let new_v = self.eval(value);
+    let idx_val = self.eval(index);
+    let new_v = self.eval(value);
 
-        match self.lookup(&name) {
-            Value::Array(arr) => {
-                if let Ok(mut a) = arr.write() {
-                    if idx >= a.len() {
-                        return Value::Error("Index out of bounds.".into());
-                    }
-                    let old_val = a[idx].clone();
-                    a[idx] = new_v.clone();
-
-                    // Log index update step into history stack!
-                    if let Ok(mut h) = self.history.write() {
-                        h.push(UndoRecord::IndexUpdate {
-                            name,
-                            index: idx,
-                            old_value: old_val,
-                        });
-                    }
-
-                    new_v
-                } else {
-                    Value::Error("Array locked.".into())
+    match self.lookup(&name) {
+        // 1. Array Index Update: arr[0] = 99
+        Value::Array(arr) => {
+            let idx = match idx_val {
+                Value::Integer(i) if i >= 0 => i as usize,
+                _ => return Value::Error("Array index must be a non-negative integer.".into()),
+            };
+            if let Ok(mut a) = arr.write() {
+                if idx >= a.len() {
+                    return Value::Error("Array index out of bounds.".into());
                 }
+                let old_val = a[idx].clone();
+                a[idx] = new_v.clone();
+
+                if let Ok(mut h) = self.history.write() {
+                    h.push(UndoRecord::IndexUpdate { name, index: idx, old_value: old_val });
+                }
+                new_v
+            } else {
+                Value::Error("Array handle locked.".into())
             }
-            Value::Error(e) => Value::Error(e),
-            _ => Value::Error(format!("'{name}' is not an array.")),
         }
+
+        // 2. Map Property Update: user.role = 'Master Architect'
+        Value::Map(map) => {
+            let key = match idx_val {
+                Value::StringVal(s) => s,
+                other => other.to_string(),
+            };
+            if let Ok(mut m) = map.write() {
+                m.insert(key, new_v.clone());
+                new_v
+            } else {
+                Value::Error("Map handle locked.".into())
+            }
+        }
+
+        Value::Error(e) => Value::Error(e),
+        _ => Value::Error(format!("'{name}' is not an array or map.")),
     }
+}
 
     pub fn eval(&mut self, node: Node) -> Value {
         match node {
-            // ... existing match arms ...
-            Node::Rewind(count) => self.eval_rewind(*count), // 👈 ADD THIS MATCH ARM!
-
-            // Keep all your other match arms unchanged!
+            Node::Rewind(count) => self.eval_rewind(*count),
             Node::Integer(n) => Value::Integer(n),
             Node::Float(f) => Value::Float(f),
-            Node::StringLit(s) => Value::StringVal(s),
+            // Inside eval() in src/evaluator/mod.rs:
+
+// Inside eval() match arm for Node::StringLit(s) in src/evaluator/mod.rs:
+
+// Inside eval() match arm for Node::StringLit(s) in src/evaluator/mod.rs:
+
+Node::StringLit(s) => {
+    if s.contains('$') {
+        let mut result = String::new();
+        let chars: Vec<char> = s.chars().collect();
+        let mut i = 0;
+
+        while i < chars.len() {
+            if chars[i] == '$' && i + 1 < chars.len() && (chars[i + 1].is_alphabetic() || chars[i + 1] == '_') {
+                let start_idx = i;
+                i += 1; // skip '$'
+                
+                let mut var_name = String::new();
+                while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                    var_name.push(chars[i]);
+                    i += 1;
+                }
+
+                let val = self.lookup(&var_name);
+                if !matches!(val, Value::Error(_)) {
+                    result.push_str(&format!("{}", val));
+                } else {
+                    // Variable doesn't exist: leave literal '$var_name' as text!
+                    result.push_str(&s[start_idx..i]);
+                }
+            } else {
+                result.push(chars[i]);
+                i += 1;
+            }
+        }
+        Value::StringVal(result)
+    } else {
+        Value::StringVal(s)
+    }
+}
             Node::Boolean(b) => Value::Boolean(b),
             Node::Null => Value::Null,
             Node::Array(items) => {
@@ -263,7 +345,7 @@ impl Evaluator {
                 let v = self.eval(*value);
                 let mut c = self.constants.write().unwrap();
                 if c.contains_key(&name) {
-                    return Value::Error(format!("Constant '{name}' already exists."));
+                    return Value::Error(format!("Constant '{name}' already exists. This constant is more popular than a surprise outage."));
                 }
                 c.insert(name, v.clone());
                 v
@@ -272,7 +354,7 @@ impl Evaluator {
             Node::Summon(name) => {
                 let v = self.lookup(&name);
                 if matches!(v, Value::Error(_)) {
-                    Value::Error(format!("'{}' could not be summoned.", name))
+                    Value::Error(format!("'{}' could not be summoned. That variable is hiding from the code like a coward in a thunderstorm.", name))
                 } else {
                     v
                 }
@@ -309,6 +391,16 @@ impl Evaluator {
             Node::Circle { name, count, body } => self.eval_circle(name, *count, body),
             Node::Shatter => Value::Break,
             Node::Skip => Value::Continue,
+            Node::Block(nodes) => {
+            let mut last = Value::Null;
+            for n in nodes {
+                last = self.eval(n);
+                if matches!(last, Value::Return(_) | Value::Break | Value::Continue) {
+                    return last;
+                }
+            }
+            last
+        },
             Node::Guard { condition, body } => self.eval_guard(*condition, body),
             Node::Attempt { body, rescue_param, rescue_body, always_body } => self.eval_attempt(body, rescue_param, rescue_body, always_body),
             Node::Protect { vars, body } => self.eval_protect(vars, body),
@@ -343,6 +435,12 @@ impl Evaluator {
             Node::CryptoCall { method, args } => self.eval_crypto_call(method, args),
             Node::UseModule(path) => self.eval_use_module(path),
             Node::DbCall { method, args } => self.eval_db_builtin(&method, args),
+            Node::Judge { expr, cases, default_case } => self.eval_judge(*expr, cases, default_case),
+            Node::PaintCall { method, args } => self.eval_paint_builtin(&method, args),
+            Node::Bond { target, alias } => self.eval_bond(target, alias),
+            Node::VbpCall { method, args } => self.eval_vbp_builtin(&method, args),
+            Node::VaultCall { method, args } => self.eval_vault_builtin(&method, args),
+            Node::Weave { count, body } => self.eval_weave(*count, body),
         }
     }
 }

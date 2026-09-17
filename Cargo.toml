@@ -1,6 +1,6 @@
 [package]
 name = "valence"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 authors = ["Failed Knight"]
 description = "Valence Language Runtime & Toolchain"
@@ -23,3 +23,4 @@ path = "src/bin/val_main.rs"
 [dependencies]
 chrono = "0.4"
 ureq = "2"
+memmap2 = "0.9"

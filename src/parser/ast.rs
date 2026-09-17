@@ -1,3 +1,5 @@
+//! Abstract syntax tree nodes produced by the parser and consumed by the evaluator.
+
 #[derive(Debug, Clone)]
 pub enum Node {
     VarLDecl { name: String, value: Box<Node> },
@@ -60,4 +62,31 @@ pub enum Node {
     Protect { vars: Vec<String>, body: Vec<Node> },
     Rewind(Box<Node>),
     DbCall { method: String, args: Vec<Node> },
+
+    Judge {
+        expr: Box<Node>,
+        cases: Vec<(Node, Node)>,
+        default_case: Option<Box<Node>>,
+    },
+
+    PaintCall {
+        method: String,
+        args: Vec<Node>,
+    },
+
+    Block(Vec<Node>),
+
+    Bond {
+        target: String,
+        alias: String,
+    },
+
+    VbpCall { method: String, args: Vec<Node> },
+
+    VaultCall { method: String, args: Vec<Node> },
+
+    Weave {
+        count: Box<Node>,
+        body: Vec<Node>,
+    }
 }

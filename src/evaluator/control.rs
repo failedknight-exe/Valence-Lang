@@ -44,26 +44,44 @@ impl Evaluator {
     }
 
     pub fn eval_circle(&mut self, name: String, count: Node, body: Vec<Node>) -> Value {
-        let count_val = self.eval(count);
-        let times = match count_val { Value::Integer(n) => n, _ => return Value::Null };
-        for i in 0..times {
-            if let Ok(mut env) = self.locals.write() {
-                env.define(name.clone(), Value::Integer(i));
-            }
-            let mut break_loop = false;
-            for node in body.clone() {
-                let result = self.eval(node);
-                match result {
-                    Value::Return(_) => return result,
-                    Value::Break => { break_loop = true; break; }
-                    Value::Continue => { break; }
-                    _ => {}
-                }
-            }
-            if break_loop { break; }
+    let count_val = self.eval(count);
+    let times = match count_val {
+        Value::Integer(n) => n,
+        _ => return Value::Null,
+    };
+
+    let mut step: i64 = 0;
+    loop {
+        if times != -1 && step >= times {
+            break;
         }
-        Value::Null
+
+        if let Ok(mut env) = self.locals.write() {
+            env.define(name.clone(), Value::Integer(step));
+        }
+
+        let mut should_shatter = false;
+        for node in body.clone() {
+            let result = self.eval(node);
+            match result {
+                Value::Return(_) => return result,
+                Value::Break => {
+                    should_shatter = true;
+                    break;
+                }
+                Value::Continue => break,
+                _ => {}
+            }
+        }
+
+        if should_shatter {
+            break;
+        }
+        step += 1;
     }
+
+    Value::Null
+}
 
     pub fn eval_guard(&mut self, condition: Node, body: Vec<Node>) -> Value {
         let cond = self.eval(condition);

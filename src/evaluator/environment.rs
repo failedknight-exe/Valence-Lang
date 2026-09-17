@@ -1,4 +1,4 @@
-// src/evaluator/environment.rs
+//! Lexically nested variable scopes used by the evaluator.
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -31,7 +31,9 @@ impl Environment {
 
     pub fn get(&self, name: &str) -> Option<Value> {
         if let Some(v) = self.vars.get(name) {
-            return Some(v.clone()); // clone is cheap for handles
+            // Cloning preserves the value's shared-handle semantics for arrays and
+            // maps while keeping scalar values independent of the environment.
+            return Some(v.clone());
         }
         if let Some(parent) = &self.parent {
             if let Ok(p) = parent.read() {

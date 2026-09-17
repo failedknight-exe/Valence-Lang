@@ -1,6 +1,7 @@
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
-    // Keywords
+    // Language words are represented separately so the parser can dispatch on
+    // syntax without comparing identifier strings.
     VarL, VarG, Summon, Update, Print,
     Check, OrCheck, Else,
     Circle, Shatter, Skip,
@@ -9,24 +10,35 @@ pub enum Token {
     True, False, Use, When, Every,
     And, Or, Not, Const, Input, Type,
     ToInt, ToFloat, ToString, ToBool,
-    Math, File,
+    Math, File, Db, Rewind,
 
-    // Literals
+    // Domain-specific syntax introduced by the language extensions.
+    Judge,
+    Paint,
+    FatArrow,
+    Bond,
+    As,
+    Vbp,
+
+    Vault,
+    Weave,
+
+    // Literal values are converted from source text by the lexer.
     Integer(i64),
     Float(f64),
     StringLit(String),
     Null,
 
-    // Operators
+    // Operators retain their own token so precedence is handled by the parser.
     Plus, Minus, Star, Slash, Percent, DoubleStar,
     Equals, TripleEquals, EqualEqual, NotEqual,
     Greater, Less, GreaterEqual, LessEqual,
 
-    // Delimiters
+    // Structural punctuation used by expressions and blocks.
     LParen, RParen, LBrace, RBrace,
     LBracket, RBracket, Comma, Colon, Pipe, Dot,
 
-    // Special
+    // Newline is retained for parser navigation, while EOF marks input exhaustion.
     Newline, EOF,
 
     // Identifier
@@ -36,5 +48,5 @@ pub enum Token {
     Attempt, Rescue, Always,
 
     // Backend
-    Json, Date, System, Http, Crypto, Async, Protect, Rewind, Db,
+    Json, Date, System, Http, Crypto, Async, Protect,
 }

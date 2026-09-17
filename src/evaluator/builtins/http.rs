@@ -7,7 +7,7 @@ impl Evaluator {
     pub fn eval_http_builtin(&mut self, method: &str, args: Vec<Node>) -> Value {
         match method {
             "get" => {
-                if args.is_empty() { return Value::Error("http.get needs a URL".to_string()); }
+                if args.is_empty() { return Value::Error("http.get needs a URL. Without a URL, this is just a staring contest with a dead network.".to_string()); }
                 let url = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
                     _ => return Value::Error("URL must be a string".to_string()),
@@ -15,13 +15,13 @@ impl Evaluator {
                 match ureq::get(&url).call() {
                     Ok(res) => match res.into_string() {
                         Ok(body) => Value::StringVal(body),
-                        Err(e) => Value::Error(format!("Failed to parse response body: {}", e)),
+                        Err(e) => Value::Error(format!("Failed to parse response body: {}. The server sent a message, but the decoder waved the white flag.", e)),
                     },
-                    Err(e) => Value::Error(format!("HTTP GET failed: {}", e)),
+                    Err(e) => Value::Error(format!("HTTP GET failed: {}. The endpoint said no, and your code heard it as a challenge.", e)),
                 }
             }
             "post" => {
-                if args.len() < 2 { return Value::Error("http.post needs URL and body string".to_string()); }
+                if args.len() < 2 { return Value::Error("http.post needs URL and body string. Posting without a body is just shouting into the void.".to_string()); }
                 let url = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
                     _ => return Value::Error("URL must be a string".to_string()),
@@ -39,7 +39,7 @@ impl Evaluator {
                 }
             }
             "put" => {
-                if args.len() < 2 { return Value::Error("http.put needs URL and body".to_string()); }
+                if args.len() < 2 { return Value::Error("http.put needs URL and body. You can't update the internet with a shrug and a prayer.".to_string()); }
                 let url = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
                     _ => return Value::Error("URL must be a string".to_string()),
@@ -53,11 +53,11 @@ impl Evaluator {
                         Ok(body) => Value::StringVal(body),
                         Err(e) => Value::Error(format!("Failed to read response: {}", e)),
                     },
-                    Err(e) => Value::Error(format!("HTTP PUT failed: {}", e)),
+                    Err(e) => Value::Error(format!("HTTP PUT failed: {}. The server rejected your update like a bad review.", e)),
                 }
             }
             "delete" => {
-                if args.is_empty() { return Value::Error("http.delete needs URL".to_string()); }
+                if args.is_empty() { return Value::Error("http.delete needs URL. Deleting without a target is just digital vandalism without a victim.".to_string()); }
                 let url = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
                     _ => return Value::Error("URL must be a string".to_string()),
@@ -67,11 +67,11 @@ impl Evaluator {
                         Ok(body) => Value::StringVal(body),
                         Err(e) => Value::Error(format!("Failed to read response: {}", e)),
                     },
-                    Err(e) => Value::Error(format!("HTTP DELETE failed: {}", e)),
+                    Err(e) => Value::Error(format!("HTTP DELETE failed: {}. The service refused to erase your mistake on principle.", e)),
                 }
             }
             "status" => {
-                if args.is_empty() { return Value::Error("http.status needs a URL".to_string()); }
+                if args.is_empty() { return Value::Error("http.status needs a URL. Without a destination, even the status code is just a rumor.".to_string()); }
                 let url = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
                     _ => return Value::Error("URL must be a string".to_string()),
@@ -83,14 +83,14 @@ impl Evaluator {
                 }
             }
             "download" => {
-                if args.len() < 2 { return Value::Error("http.download needs URL and destination filename".to_string()); }
+                if args.len() < 2 { return Value::Error("http.download needs URL and destination filename. You can't download a file to nowhere and call it a workflow.".to_string()); }
                 let url = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
                     _ => return Value::Error("URL must be a string".to_string()),
                 };
                 let filename = match self.eval(args[1].clone()) {
                     Value::StringVal(s) => s,
-                    _ => return Value::Error("Filename must be a string".to_string()),
+                    _ => return Value::Error("Filename must be a string. A number is not a destination, and a boolean is not a plan.".to_string()),
                 };
                 match ureq::get(&url).call() {
                     Ok(res) => {
@@ -98,16 +98,16 @@ impl Evaluator {
                         match res.into_reader().read_to_end(&mut bytes) {
                             Ok(_) => match std::fs::write(&filename, &bytes) {
                                 Ok(_) => Value::Boolean(true),
-                                Err(e) => Value::Error(format!("Failed to save download: {}", e)),
+                                Err(e) => Value::Error(format!("Failed to save download: {}. The file fought back and won.", e)),
                             },
-                            Err(e) => Value::Error(format!("Failed to read payload: {}", e)),
+                            Err(e) => Value::Error(format!("Failed to read payload: {}. The response arrived, then immediately ghosted your parser.", e)),
                         }
                     }
-                    Err(e) => Value::Error(format!("Download failed: {}", e)),
+                    Err(e) => Value::Error(format!("Download failed: {}. The internet is giving you a cold shoulder.", e)),
                 }
             }
             "getJson" => {
-                if args.is_empty() { return Value::Error("http.getJson needs URL".to_string()); }
+                if args.is_empty() { return Value::Error("http.getJson needs URL. JSON without a URL is just a sad dictionary.".to_string()); }
                 let url = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
                     _ => return Value::Error("URL must be a string".to_string()),
@@ -141,13 +141,13 @@ impl Evaluator {
                                 Value::StringVal(body)
                             }
                         }
-                        Err(e) => Value::Error(format!("Failed to decode response: {}", e)),
+                        Err(e) => Value::Error(format!("Failed to decode response: {}. The JSON was there; your decoder just wasn't ready for the drama.", e)),
                     },
                     Err(e) => Value::Error(format!("HTTP request failed: {}", e)),
                 }
             }
             "getH" => {
-                if args.len() < 2 { return Value::Error("http.getH needs URL and headers map".to_string()); }
+                if args.len() < 2 { return Value::Error("http.getH needs URL and headers map. A request without headers is like texting with a broken keyboard.".to_string()); }
                 let url = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
                     _ => return Value::Error("URL must be a string".to_string()),
@@ -170,7 +170,7 @@ impl Evaluator {
                 }
             }
             "postH" => {
-                if args.len() < 3 { return Value::Error("http.postH needs URL, body, and headers map".to_string()); }
+                if args.len() < 3 { return Value::Error("http.postH needs URL, body, and headers map. Posting without headers is just a dramatic handshake with no rules.".to_string()); }
                 let url = match self.eval(args[0].clone()) {
                     Value::StringVal(s) => s,
                     _ => return Value::Error("URL must be a string".to_string()),
@@ -196,7 +196,7 @@ impl Evaluator {
                     Err(e) => Value::Error(format!("HTTP POST failed: {}", e)),
                 }
             }
-            _ => Value::Error(format!("'{}' is not a valid http method", method)),
+            _ => Value::Error(format!("'{}' is not a valid http method. That's not an HTTP verb; it's a typo with ambition.", method)),
         }
     }
 }

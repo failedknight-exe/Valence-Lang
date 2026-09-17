@@ -1,3 +1,5 @@
+// src/parser/statements.rs - Direct Assignment & Statement Parser
+
 use super::Parser;
 use super::ast::Node;
 use crate::lexer::Token;
@@ -22,6 +24,10 @@ impl Parser {
             Token::Attempt => self.parse_attempt(),
             Token::Protect => self.parse_protect(),
             Token::Async   => self.parse_async(),
+            Token::Judge   => self.parse_judge(),
+            Token::Paint   => self.parse_builtin_stmt("paint"),
+            Token::Bond    => self.parse_bond(),
+            Token::Vbp     => self.parse_builtin_stmt("vbp"),
             Token::Shatter => { self.advance(); Some(Node::Shatter) }
             Token::Skip    => { self.advance(); Some(Node::Skip) }
 
@@ -34,16 +40,111 @@ impl Parser {
                 Some(Node::Summon(name))
             }
 
+            // 💡 DIRECT ASSIGNMENTS & METHOD CALLS (No 'update' keyword required!)
             Token::Ident(_) => {
-                match self.peek_ahead() {
-                    Token::LParen => self.parse_func_call_statement(),
-                    Token::Dot    => self.parse_method_call_statement(),
+                let id_name = match self.advance().clone() {
+                    Token::Ident(n) => n,
+                    _ => unreachable!(),
+                };
+
+                match self.peek() {
+                    // Direct var update: x = 10
+                    Token::Equals => {
+                        self.advance(); // consume '='
+                        let val = self.parse_expression()?;
+                        Some(Node::UpdateDecl {
+                            name: id_name,
+                            value: Box::new(val),
+                        })
+                    }
+                    // Direct array index update: arr[0] = 99
+                    Token::LBracket => {
+                        self.advance(); // consume '['
+                        let idx = self.parse_expression()?;
+                        self.expect(&Token::RBracket);
+                        if self.peek() == &Token::Equals {
+                            self.advance(); // consume '='
+                            let val = self.parse_expression()?;
+                            Some(Node::UpdateIndex {
+                                name: id_name,
+                                index: Box::new(idx),
+                                value: Box::new(val),
+                            })
+                        } else {
+                            println!("[PARSE ERROR] Expected '=' after index in assignment");
+                            None
+                        }
+                    }
+                    // Direct property update OR method call: user.role = 'Master'
+                    Token::Dot => {
+                        self.advance(); // consume '.'
+                        let field_or_method = match self.advance().clone() {
+                            Token::Ident(m) => m,
+                            _ => {
+                                println!("[PARSE ERROR] Expected property or method name after '.'");
+                                return None;
+                            }
+                        };
+
+                        if self.peek() == &Token::Equals {
+                            // Direct property assignment: user.role = 'Master'
+                            self.advance(); // consume '='
+                            let val = self.parse_expression()?;
+                            Some(Node::UpdateIndex {
+                                name: id_name,
+                                index: Box::new(Node::StringLit(field_or_method)),
+                                value: Box::new(val),
+                            })
+                        } else {
+                            // Normal method call: user.greet() or user.upper
+                            let mut args = Vec::new();
+                            if self.peek() == &Token::LParen {
+                                self.advance();
+                                if self.peek() != &Token::RParen {
+                                    args.push(self.parse_expression()?);
+                                    while self.peek() == &Token::Comma {
+                                        self.advance();
+                                        args.push(self.parse_expression()?);
+                                    }
+                                }
+                                self.expect(&Token::RParen);
+                            }
+                            Some(Node::MethodCall {
+                                object: id_name,
+                                method: field_or_method,
+                                args,
+                            })
+                        }
+                    }
+                    // Direct function call: greet()
+                    Token::LParen => {
+                        self.advance(); // consume '('
+                        let mut args = Vec::new();
+                        if self.peek() != &Token::RParen {
+                            args.push(self.parse_expression()?);
+                            while self.peek() == &Token::Comma {
+                                self.advance();
+                                args.push(self.parse_expression()?);
+                            }
+                        }
+                        self.expect(&Token::RParen);
+                        Some(Node::FuncCall {
+                            name: id_name,
+                            args,
+                        })
+                    }
                     _ => {
-                        println!("[PARSE ERROR] Unexpected token: {:?}", self.peek());
-                        self.advance();
+                        println!("[PARSE ERROR] Unexpected token after identifier: {:?}", self.peek());
                         None
                     }
                 }
+            }
+
+            Token::LBrace => {
+                self.advance();
+                let body = self.parse_block()?;
+                self.expect(&Token::RBrace);
+                Some(Node::Block(body))
             }
 
             Token::Math   => self.parse_builtin_stmt("math"),
@@ -53,16 +154,7 @@ impl Parser {
             Token::System => self.parse_builtin_stmt("system"),
             Token::Http   => self.parse_builtin_stmt("http"),
             Token::Crypto => self.parse_builtin_stmt("crypto"),
-
-            Token::Rewind => {
-                self.advance();
-                self.expect(&Token::LParen);
-                let count = self.parse_expression()?;
-                self.expect(&Token::RParen);
-                Some(Node::Rewind(Box::new(count)))
-            }
-
-            Token::Db => self.parse_builtin_stmt("db"),
+            Token::Db     => self.parse_builtin_stmt("db"),
 
             _ => {
                 println!("[PARSE ERROR] Unexpected token: {:?}", self.peek());
@@ -70,6 +162,68 @@ impl Parser {
                 None
             }
         }
+    }
+
+    fn parse_judge(&mut self) -> Option<Node> {
+        self.advance();
+        self.expect(&Token::LParen);
+        let expr = self.parse_expression()?;
+        self.expect(&Token::RParen);
+        self.expect(&Token::LBrace);
+
+        let mut cases = Vec::new();
+        let mut default_case = None;
+
+        loop {
+            match self.peek() {
+                Token::RBrace | Token::EOF => break,
+                Token::Newline => { self.advance(); }
+                Token::Ident(name) if name == "_" => {
+                    self.advance();
+                    if !self.expect(&Token::FatArrow) { return None; }
+                    let body = self.parse_statement()?;
+                    default_case = Some(Box::new(body));
+                    if self.peek() == &Token::Comma { self.advance(); }
+                }
+                _ => {
+                    let pattern = self.parse_expression()?;
+                    if !self.expect(&Token::FatArrow) { return None; }
+                    let body = self.parse_statement()?;
+                    cases.push((pattern, body));
+                    if self.peek() == &Token::Comma { self.advance(); }
+                }
+            }
+        }
+
+        self.expect(&Token::RBrace);
+        Some(Node::Judge {
+            expr: Box::new(expr),
+            cases,
+            default_case,
+        })
+    }
+
+    fn parse_bond(&mut self) -> Option<Node> {
+        self.advance();
+        let target = match self.advance().clone() {
+            Token::StringLit(s) => s,
+            _ => {
+                println!("[PARSE ERROR] Expected string after 'bond'");
+                return None;
+            }
+        };
+
+        let alias = if self.peek() == &Token::As {
+            self.advance();
+            match self.advance().clone() {
+                Token::Ident(a) => a,
+                _ => return None,
+            }
+        } else {
+            target.replace(':', "_").replace('.', "_")
+        };
+
+        Some(Node::Bond { target, alias })
     }
 
     fn parse_varl(&mut self) -> Option<Node> {
@@ -165,11 +319,19 @@ impl Parser {
         self.advance();
         let name = match self.advance().clone() {
             Token::Ident(n) => n,
-            _ => return None,
+            _ => "i".to_string(),
         };
-        self.expect(&Token::LParen);
-        let count = self.parse_expression()?;
-        self.expect(&Token::RParen);
+
+        let count = if self.peek() == &Token::Forever {
+            self.advance();
+            Node::Integer(-1)
+        } else {
+            self.expect(&Token::LParen);
+            let c = self.parse_expression()?;
+            self.expect(&Token::RParen);
+            c
+        };
+
         self.expect(&Token::LBrace);
         let body = self.parse_block()?;
         self.expect(&Token::RBrace);
@@ -372,49 +534,6 @@ impl Parser {
         Some(Node::AsyncBlock { body })
     }
 
-    fn parse_func_call_statement(&mut self) -> Option<Node> {
-        let name = match self.advance().clone() {
-            Token::Ident(n) => n,
-            _ => return None,
-        };
-        self.expect(&Token::LParen);
-        let mut args = Vec::new();
-        if self.peek() != &Token::RParen {
-            args.push(self.parse_expression()?);
-            while self.peek() == &Token::Comma {
-                self.advance();
-                args.push(self.parse_expression()?);
-            }
-        }
-        self.expect(&Token::RParen);
-        Some(Node::FuncCall { name, args })
-    }
-
-    fn parse_method_call_statement(&mut self) -> Option<Node> {
-        let name = match self.advance().clone() {
-            Token::Ident(n) => n,
-            _ => return None,
-        };
-        self.advance(); // dot
-        let method = match self.advance().clone() {
-            Token::Ident(m) => m,
-            _ => return None,
-        };
-        let mut args = Vec::new();
-        if self.peek() == &Token::LParen {
-            self.advance();
-            if self.peek() != &Token::RParen {
-                args.push(self.parse_expression()?);
-                while self.peek() == &Token::Comma {
-                    self.advance();
-                    args.push(self.parse_expression()?);
-                }
-            }
-            self.expect(&Token::RParen);
-        }
-        Some(Node::MethodCall { object: name, method, args })
-    }
-
     fn parse_builtin_stmt(&mut self, kind: &str) -> Option<Node> {
         self.advance();
         self.expect(&Token::Dot);
@@ -443,6 +562,8 @@ impl Parser {
             "http"   => Some(Node::HttpCall { method, args }),
             "crypto" => Some(Node::CryptoCall { method, args }),
             "db"     => Some(Node::DbCall { method, args }),
+            "paint"  => Some(Node::PaintCall { method, args }),
+            "vbp"    => Some(Node::VbpCall { method, args }),
             _ => None,
         }
     }

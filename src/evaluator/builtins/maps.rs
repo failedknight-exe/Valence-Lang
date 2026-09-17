@@ -1,4 +1,4 @@
-// src/evaluator/builtins/maps.rs
+//! Methods for inspecting, updating, and field-accessing evaluator maps.
 use crate::evaluator::value::Value;
 use crate::evaluator::Evaluator;
 use crate::parser::Node;
@@ -15,7 +15,7 @@ impl Evaluator {
         let map = match map_val {
             Value::Map(m) => m,
             Value::Error(e) => return Value::Error(e),
-            _ => return Value::Error(format!("'{object}' is not a map.")),
+            _ => return Value::Error(format!("'{object}' is not a map. That's not a dictionary; that's just a dramatic bucket.")),
         };
 
         match method {
@@ -70,9 +70,10 @@ impl Evaluator {
                     let mut m = map.write().unwrap();
                     m.remove(&key);
                 }
-                Value::Map(map) // same handle
+                Value::Map(map)
             }
-            // field-style fallback: user.config
+            // Unknown methods are treated as field access to support `user.name`
+            // without adding a separate AST node for map fields.
             other => {
                 let m = map.read().unwrap();
                 m.get(other).cloned().unwrap_or(Value::Null)

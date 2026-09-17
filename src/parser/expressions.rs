@@ -1,3 +1,5 @@
+//! Recursive-descent expression parsing ordered from lowest to highest precedence.
+
 use super::Parser;
 use super::ast::Node;
 use crate::lexer::Token;
@@ -229,6 +231,34 @@ impl Parser {
             Token::Http => self.parse_builtin_expr("http"),
             Token::Crypto => self.parse_builtin_expr("crypto"),
             Token::Db => self.parse_builtin_expr("db"),
+            Token::Paint => self.parse_builtin_expr("paint"),
+            Token::Vbp => self.parse_builtin_expr("vbp"),
+            Token::Vault => self.parse_builtin_expr("vault"),
+
+            Token::Weave => {
+        self.expect(&Token::LParen);
+        let count = self.parse_expression()?;
+        self.expect(&Token::RParen);
+        self.expect(&Token::LBrace);
+        
+        let mut body = Vec::new();
+        loop {
+            match self.peek() {
+                Token::RBrace | Token::EOF => break,
+                Token::Newline => { self.advance(); }
+                _ => {
+                    if let Some(node) = self.parse_statement() {
+                        body.push(node);
+                    }
+                }
+            }
+        }
+        self.expect(&Token::RBrace);
+        Some(Node::Weave {
+            count: Box::new(count),
+            body,
+        })
+    }
 
             Token::Ident(name) => {
                 if self.peek() == &Token::LParen {
@@ -312,6 +342,9 @@ impl Parser {
             "http"   => Some(Node::HttpCall { method, args }),
             "crypto" => Some(Node::CryptoCall { method, args }),
             "db"     => Some(Node::DbCall { method, args }),
+            "paint"  => Some(Node::PaintCall { method, args }),
+            "vbp"    => Some(Node::VbpCall { method, args}),
+            "vault"  => Some(Node::VaultCall { method, args }),
             _ => None,
         }
     }

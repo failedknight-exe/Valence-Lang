@@ -1,3 +1,5 @@
+//! Function calls, lexical call frames, asynchronous execution, and triggers.
+
 use super::Evaluator;
 use super::value::{StoredFunc, Value};
 use crate::parser::Node;
@@ -16,12 +18,12 @@ impl Evaluator {
             let map = self.functions.read().unwrap();
             match map.get(&name) {
                 Some(f) => f.clone(),
-                None => return Value::Error(format!("Function '{name}' does not exist.")),
+                None => return Value::Error(format!("Function '{name}' does not exist. That's not a function; that's a hopeful rumor.")),
             }
         };
 
         if func.params.len() != args.len() {
-            return Value::Error("Argument count mismatch.".into());
+            return Value::Error("Argument count mismatch. Your function call is less balanced than a one-legged stool.".into());
         }
 
         let mut vals = Vec::new();
@@ -30,6 +32,9 @@ impl Evaluator {
         }
 
         let old_locals = self.locals.clone();
+        // A call frame is a child environment. Restoring the previous pointer on
+        // every normal return keeps parameters and local declarations out of the
+        // caller's scope while still allowing reads through the parent chain.
         self.locals = crate::evaluator::environment::Environment::child(old_locals.clone());
 
         {
@@ -57,17 +62,19 @@ impl Evaluator {
             "time" => {
                 let ms = match self.eval(value) {
                     Value::Integer(n) => n as u64,
-                    _ => return Value::Error("trigger[time] needs milliseconds integer".to_string()),
+                    _ => return Value::Error("trigger[time] needs milliseconds integer. A float or string is not a timer; it's a mood swing.".to_string()),
                 };
                 let func = match self.functions.read().unwrap().get(&name).cloned() {
                     Some(f) => f,
-                    None => return Value::Error(format!("Function '{}' not found", name)),
+                    None => return Value::Error(format!("Function '{}' not found. That callback is missing in action, not just in name.", name)),
                 };
                 let func_body = func.body.clone();
                 let mut forked = self.fork();
                 std::thread::spawn(move || {
                     loop {
                         std::thread::sleep(std::time::Duration::from_millis(ms));
+                        // Each tick receives a fresh local frame; shared globals and
+                        // containers remain available through the forked evaluator.
                         let old_locals = forked.locals.clone();
                         forked.locals = crate::evaluator::environment::Environment::child(old_locals.clone());
                         for node in func_body.clone() {
@@ -86,11 +93,13 @@ impl Evaluator {
                 self.when_triggers.write().unwrap().push((name, value, true));
                 Value::Null
             }
-            _ => Value::Error(format!("Unknown trigger type: '{}'", trigger_type)),
+            _ => Value::Error(format!("Unknown trigger type: '{}'. That trigger is less valid than a haunted alarm clock.", trigger_type)),
         }
     }
 
     pub fn check_triggers(&mut self) {
+        // Evaluate conditions from a snapshot so callbacks can register or remove
+        // triggers without holding the trigger lock during arbitrary user code.
         let triggers = {
             let guard = self.when_triggers.read().unwrap();
             guard.clone()

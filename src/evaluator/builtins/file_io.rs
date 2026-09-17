@@ -11,7 +11,7 @@ impl Evaluator {
                 let path = match self.eval(args[0].clone()) { Value::StringVal(s) => s, _ => return Value::Null };
                 match std::fs::read_to_string(&path) {
                     Ok(content) => Value::StringVal(content),
-                    Err(_) => Value::Error(format!("Could not read file '{}'.", path)),
+                    Err(_) => Value::Error(format!("Could not read file '{}'. That's a file with trust issues and zero cooperation.", path)),
                 }
             }
             "write" => {
@@ -20,7 +20,7 @@ impl Evaluator {
                 let content = format!("{}", self.eval(args[1].clone()));
                 match std::fs::write(&path, content) {
                     Ok(_) => Value::Boolean(true),
-                    Err(_) => Value::Error(format!("Could not write to '{}'.", path)),
+                    Err(_) => Value::Error(format!("Could not write to '{}'. The file refused to take your nonsense.", path)),
                 }
             }
             "append" => {
@@ -32,7 +32,7 @@ impl Evaluator {
                         let _ = f.write_all(content.as_bytes());
                         Value::Boolean(true)
                     }
-                    Err(_) => Value::Error(format!("Could not append to '{}'.", path)),
+                    Err(_) => Value::Error(format!("Could not append to '{}'. That file has more resistance than a bad Wi-Fi signal.", path)),
                 }
             }
             "exists" => {

@@ -1,9 +1,8 @@
-//! Command-line runtime launcher for the Connect language.
-//!
-//! Handles `cor run`, `cor check`, `cor help`, and `cor version`.
+// src/bin/cor_main.rs - Valence Runtime & Interactive REPL
 
 use std::env;
 use std::fs;
+use std::io::{self, Write};
 
 use valence::lexer::Lexer;
 use valence::parser::Parser;
@@ -13,36 +12,21 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
-        println!("");
-        println!("  ██╗   ██╗ █████╗ ██╗     ███████╗███╗   ██╗██╗████████╗");
-        println!("  ██║   ██║██╔══██╗██║     ██╔════╝████╗  ██║██║╚══██╔══╝");
-        println!("  ██║   ██║███████║██║     █████╗  ██╔██╗ ██║██║   ██║   ");
-        println!("  ╚██╗ ██╔╝██╔══██║██║     ██╔══╝  ██║╚██╗██║██║   ██║   ");
-        println!("   ╚████╔╝ ██║  ██║███████╗███████╗██║ ╚████║██║   ██║   ");
-        println!("    ╚═══╝  ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═══╝╚═╝   ╚═╝   ");
-        println!("");
-        println!(" Valence Language Runtime v1.0.0");
-        println!(" Sirius Zenith Labs");
-        println!(" Type 'cor help' for commands");
-        println!("");
+        start_repl(); // 👈 OPENS INTERACTIVE SHELL!
         return;
     }
-    // ... rest of file stays the same
-
 
     match args[1].as_str() {
         "run" => {
             let filename = if args.len() > 2 {
                 args[2].clone()
+            } else if std::path::Path::new("src/bridge.cor").exists() {
+                "src/bridge.cor".to_string()
+            } else if std::path::Path::new("bridge.cor").exists() {
+                "bridge.cor".to_string()
             } else {
-                if std::path::Path::new("src/bridge.cor").exists() {
-                    "src/bridge.cor".to_string()
-                } else if std::path::Path::new("bridge.cor").exists() {
-                    "bridge.cor".to_string()
-                } else {
-                    println!("cor: No file specified and no bridge.cor found.");
-                    return;
-                }
+                println!("cor: No file specified and no bridge.cor found.");
+                return;
             };
 
             if !filename.ends_with(".cor") {
@@ -58,8 +42,8 @@ fn main() {
                 }
             };
 
-            println!("▶ Running {}...\n", filename);
-            run_file(&contents, &filename);
+            println!("\x1b[36m▶ Running {}...\x1b[0m\n", filename);
+            run_file(&contents);
         }
 
         "check" => {
@@ -80,37 +64,71 @@ fn main() {
         }
 
         "help" => {
-            println!("");
-            println!("cor - Connect Language Runtime");
-            println!("Sirius Zenith Labs | v1.0.0");
-            println!("");
+            println!("\ncor - Valence Language Runtime");
+            println!("Sirius Zenith Labs | v0.3.1\n");
             println!("Commands:");
+            println!("  cor                    Open Interactive REPL Shell");
             println!("  cor run                Execute bridge.cor");
             println!("  cor run <file.cor>     Execute specific file");
             println!("  cor check <file.cor>   Static syntax analysis");
             println!("  cor help               Display this menu");
-            println!("  cor version            Runtime version");
-            println!("");
+            println!("  cor version            Runtime version\n");
         }
 
         "version" => {
-            println!("Connect Runtime v1.0.0");
-            println!("Sirius Zenith Labs");
+            println!("Valence Runtime v0.3.1");
+            println!("Sirius Zenith Labs / failedknight-exe");
         }
 
         _ => {
-            println!("cor: '{}' is not a command.", args[1]);
-            println!("Try 'cor help'");
+            println!("cor: '{}' is not a command. Try 'cor help'", args[1]);
         }
     }
 }
 
-/// Run a source file through the lexer, parser, and evaluator.
-fn run_file(contents: &str, _filename: &str) {
-    if !syntax_check(contents) {
-        return;
-    }
+/// 🐚 INTERACTIVE REPL SHELL
+fn start_repl() {
+    println!("\x1b[36m  ██╗   ██╗ █████╗ ██╗     ███████╗███╗   ██╗██╗████████╗\x1b[0m");
+    println!("\x1b[36m  ██║   ██║██╔══██╗██║     ██╔════╝████╗  ██║██║╚══██╔══╝\x1b[0m");
+    println!("\x1b[36m  ██║   ██║███████║██║     █████╗  ██╔██╗ ██║██║   ██║   \x1b[0m");
+    println!("\x1b[36m  ╚██╗ ██╔╝██╔══██║██║     ██╔══╝  ██║╚██╗██║██║   ██║   \x1b[0m");
+    println!("\x1b[36m   ╚████╔╝ ██║  ██║███████╗███████╗██║ ╚████║██║   ██║   \x1b[0m");
+    println!("\x1b[36m    ╚═══╝  ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═══╝╚═╝   ╚═╝   \x1b[0m");
+    println!("\n\x1b[1mValence Interactive REPL (v0.3.1)\x1b[0m");
+    println!("Type 'exit' to quit.\n");
 
+    let mut evaluator = Evaluator::new();
+
+    loop {
+        print!("\x1b[32mcor> \x1b[0m");
+        io::stdout().flush().unwrap();
+
+        let mut input = String::new();
+        if io::stdin().read_line(&mut input).is_err() { break; }
+        
+        let trimmed = input.trim();
+        if trimmed.is_empty() { continue; }
+        if trimmed == "exit" || trimmed == "quit" { break; }
+
+        let mut lexer = Lexer::new(trimmed);
+        let tokens = lexer.tokenize();
+        let mut parser = Parser::new(tokens);
+        let ast = parser.parse();
+
+        // Print the result of the last evaluated node dynamically!
+        let mut last_val = valence::evaluator::value::Value::Null;
+        for node in ast {
+            last_val = evaluator.eval(node);
+        }
+
+        // Only print if it's not Null (prevents annoying null spam)
+        if !matches!(last_val, valence::evaluator::value::Value::Null) {
+            println!("\x1b[33m{}\x1b[0m", last_val);
+        }
+    }
+}
+
+fn run_file(contents: &str) {
     let mut lexer = Lexer::new(contents);
     let tokens = lexer.tokenize();
     let mut parser = Parser::new(tokens);
@@ -119,43 +137,14 @@ fn run_file(contents: &str, _filename: &str) {
     evaluator.run(ast);
 }
 
-/// Perform a lightweight syntax sanity check on parentheses and braces.
-fn syntax_check(contents: &str) -> bool {
-    let mut errors_found = false;
-
-    let open_p = contents.matches('(').count();
-    let close_p = contents.matches(')').count();
-
-    if open_p > close_p {
-        println!("[SYNTAX ERROR] Unclosed parenthesis detected.");
-        println!("Damn... much like your household, this code is missing a father figure.");
-        errors_found = true;
-    } else if close_p > open_p {
-        println!("[SYNTAX ERROR] Extra closing parenthesis detected.");
-        println!("You closed something that was never opened. Deep.");
-        errors_found = true;
-    }
-
-    let open_b = contents.matches('{').count();
-    let close_b = contents.matches('}').count();
-
-    if open_b != close_b {
-        println!("[SYNTAX ERROR] Mismatched curly braces.");
-        println!("Your code block has no closure. Like your emotional wounds.");
-        errors_found = true;
-    }
-
+fn check_file(contents: &str) {
     if contents.trim().is_empty() {
         println!("[ERROR] This file is empty.");
-        errors_found = true;
+        return;
     }
-
-    !errors_found
-}
-
-fn check_file(contents: &str) {
-    let passed = syntax_check(contents);
-    if passed {
-        println!("No syntax errors found. Looking clean.");
-    }
+    let mut lexer = Lexer::new(contents);
+    let tokens = lexer.tokenize();
+    let mut parser = Parser::new(tokens);
+    let _ast = parser.parse();
+    println!("No syntax errors found. Looking clean.");
 }
