@@ -4,7 +4,10 @@ A programming language I built from scratch in Rust.
 
 ## What is Valence?
 
-Valence
+Valence...
+
+It mainly was made (and is still being made!) to connect languages easily, securly, and kepp the connection fast!
+It can do MANY more things and all is detailed below!
 
 ## Install
 ### Pre-Built (Windows)
