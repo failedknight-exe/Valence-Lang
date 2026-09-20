@@ -1,33 +1,17 @@
 # Valence
 
 A programming language I built from scratch in Rust.
-No frameworks. No shortcuts. Just pure code.
-
-Born out of boredom. Built out of love.
 
 ## What is Valence?
 
-Valence is an interpreted language that runs on a 
-Rust-native engine. It has its own lexer, parser, 
-and evaluator. Everything from variables to functions 
-to file I/O works out of the box.
-
-No pip install. No npm. No drama.
-Just write .cor files and run them.
+Valence
 
 ## Install
-
-### Build From Source
-
-git clone https://github.com/failedknight-exe/Valence-Lang
-cd Valence-Lang
-cargo build --release
-
 ### Pre-Built (Windows)
-Grab cor.exe and val.exe from 
+Take cor.exe and val.exe from 
 [Releases](https://github.com/failedknight-exe/Valence-Lang/releases)
 
-Drop them somewhere. Add to PATH. Done.
+Drop it anywhere and then make sure you add to path 
 
 ### Your First Project
 
@@ -35,409 +19,303 @@ val init MyProject
 cd MyProject
 cor run
 
-That's it. You're coding in Valence.
-## The Basics
+That's it.
+# Valence Command Reference & Applications
+
+## CLI
+```bash
+cor                    # Launch standard runtime environment
+cor run <file.cor>     # Auto-find and run bridge.cor or a specific file
+cor morph <file.cor> -o app.exe  # Compile to a native binary
+cor check <file.cor>   # Check file syntax without execution
+val init <project_name> # Scaffold a new project structure
+```
+
+---
+
+## Language Core
 
 ### Variables
+```valence
+varL x = 10         // Local variable - bounded to scope
+varG config = true  // Global variable - accessible everywhere
+const MAX = 100     // Immutable constant value
 
-Valence has three types of variables.
-Each one has its place. Each one has its rules.
+| |                 // Explicit null/empty value indicator
 
-varL name = 'Knight'          // Local - stays in its scope
-varG score = 0                // Global - lives everywhere
-const PI = 3.14159            // Constant - never changes
+print("hi $name")   // String interpolation syntax
+```
 
-update score = 100            // Change what you declared
-varL a, b, c = 10, 20, 30    // Multiple at once
-varL empty = | |              // Null (nothing between walls)
-varL debt = -42               // Negatives work
+### Control Flow
+```valence
+// Conditional Branching
+check (cond) { }
+orCheck (cond) { }
+else { }
 
-### Summon
+// Loops
+circle i (n) { }     // Standard numeric loop (0 to n-1)
+circle forever { }   // Infinite execution loop
+shatter              // Break loop entirely
+skip                 // Skip current iteration and move to next
 
-Valence's secret weapon.
-varL is locked to its scope. Functions can't see it.
-Unless you summon it.
-
-varL secret = 'hidden treasure'
-
-// This fails. secret is not here.
-func[callable] noLuck() {
-    print(secret)              // ERROR: not found
+// Pattern Matching
+judge (val) {
+  "a" => ...,
+  _   => ...
 }
 
-// summon pulls it in.
-func[callable] gotIt() {
-    summon secret
-    print(secret)              // Works: hidden treasure
+// Advanced Flow Control
+rewind(n)             // Time-travel mechanism: roll back the last n states
+protect (a, b) { }    // Safe scoped executions
+attempt { } rescue (err) { } always { } // Exception framework
+guard (cond) { }      // Pre-condition checking assertion
+```
+
+---
+
+## Standard Libraries & Built-ins
+
+### Type Utilities
+```valence
+type(v)      // Evaluate native data type of value
+toInt(v)     // Cast target value to integer
+toFloat(v)   // Cast target value to floating point
+toString(v)  // Cast target value to string literal
+toBool(v)    // Cast target value to boolean
+```
+
+### Data Structures
+
+#### Arrays
+`[1, 2, 3]`
+* `.len()` — Returns array size.
+* `.first()` — Access first item.
+* `.last()` — Access terminal item.
+* `.isEmpty()` — Boolean state check.
+* `.has(v)` — Check if item is inside.
+* `.indexOf(v)` — Find target index.
+* `.join(sep)` — Create a single string.
+* `.slice(a,b)` — Cut specific range.
+* `.push(v)` — Inject to terminal position.
+* `.pop()` — Extract and remove last item.
+* `.reverse()` — Flip internal array order.
+* `.sort()` — Standard numeric/string sorting.
+* `.clear()` — Wipe structure empty.
+
+#### Maps
+`{ key: val }`
+* `.keys()` — Array of property keys.
+* `.values()` — Array of property values.
+* `.size()` — Count of element pairs.
+* `.has(k)` — Evaluate key existence.
+* `.get(k)` — Pull mapped key value.
+* `.delete(k)` — Erase key-value block.
+
+### Strings
+* `.len()` — Total character length.
+* `.upper()` — Convert to uppercase.
+* `.lower()` — Convert to lowercase.
+* `.trim()` — Strip edge white spaces.
+* `.reverse()` — Invert text sequence.
+* `.contains(s)` — Check substring.
+* `.startsWith(s)` — Matches start string.
+* `.endsWith(s)` — Matches end string.
+* `.replace(a,b)` — Replace substring variables.
+* `.split(sep)` — Fragment string into array.
+* `.slice(a,b)` — Substring extract by indices.
+* `.charAt(i)` — Isolate targeted index character.
+* `.repeat(n)` — Duplicate string n times.
+* `.capitalize()` — Uppercase starting character.
+* `.camelCase()` — Parse string to camel case.
+* `.snakeCase()` — Parse string to snake case.
+* `.padLeft(n,c)` — Pad left side with character.
+* `.padRight(n,c)` — Pad right side with character.
+* `.isNumeric()` — Regex match for digits only.
+* `.isAlpha()` — Regex match for letters only.
+* `.isEmail()` — Native email syntax parsing.
+* `.wordCount()` — Extract text word totals.
+* `.truncate(n)` — Limit character length gracefully.
+* `.slug()` — Parse text for URL slug formats.
+* `.urlEncode()` — Apply standard URL safety masks.
+* `.urlDecode()` — Extract dynamic raw string from URL.
+
+---
+
+## Native Libraries
+
+### Math Engine (`math`)
+```valence
+math.sqrt(n)          math.abs(n)           math.floor(n)         math.ceil(n)          
+math.round(n)         math.random(min,max)  math.max(a,b)         math.min(a,b)         
+math.pow(b,e)         math.sin(n)           math.cos(n)           math.tan(n)           
+math.log(n)           math.log10(n)         math.pi               math.e
+```
+
+### Terminal Colors (`paint`)
+```valence
+paint.red(t)          paint.green(t)        paint.yellow(t)       paint.blue(t)         
+paint.magenta(t)      paint.cyan(t)         paint.bold(t)
+```
+
+### System Operations (`system`)
+```valence
+system.os()           system.arch()         system.env("K")       system.exec("cmd")    
+system.cwd()          system.exit(code)     system.sleep(ms)      system.args()
+```
+
+### File I/O (`file`)
+```valence
+file.read(path)       file.write(path, data) file.append(path, data)
+file.exists(path)     file.delete(path)
+```
+
+### Networking (`http`)
+```valence
+http.get(url)                http.post(url, body)         http.put(url, body)          
+http.delete(url)             http.status(url)             http.download(url, dest)     
+http.getJson(url)            http.getH(url, headers)      http.postH(url, body, headers)
+```
+
+### Storage Engine (`db`)
+```valence
+db.open(path)         db.set(k,v)           db.get(k)             db.has(k)             
+db.delete(k)
+```
+
+### Security (`crypto`)
+```valence
+crypto.hash(data)     crypto.uuid()         crypto.randomInt(min,max)
+crypto.randomBytes(n) crypto.base64Encode(s) crypto.base64Decode(s)
+```
+
+### Temporal Utilities (`date`)
+```valence
+date.now()            date.today()          date.time()           date.year()           
+date.month()          date.day()            date.hour()           date.minute()         
+date.second()         date.timestamp()      date.format(fmt)      date.dayName()        
+date.monthName()      date.micro_time()     date.nano_time()
+```
+
+### Data Serialization (`json`)
+```valence
+json.stringify(v)     json.parse(s)
+```
+
+### Interoperability & Concurrency (`vbp` / `vault`)
+```valence
+// Polyglot Engine Bonds
+bond "py:script.py" as py
+bond "java:App.java" as gui
+
+// Multiprocessing Virtual Blueprint Profile Control
+vbp.sync()
+vbp.workers
+vbp.kill
+
+// Micro-threading
+weave (n) { }
+
+// Memory Block Allocations
+vault.alloc(bytes)
+vault.write(slot, data)
+vault.read(slot)
+vault.free(slot)
+```
+
+---
+
+## Function Architecture
+
+```valence
+// Callable Definition
+func [callable] name(a, b) {
+  reply a + b
+}
+name(1, 2)
+
+// Daemon & Loop Automation Variants
+func [auto] tick() { }      // Automatically schedules lifecycle events
+func [forever] loop() { }  // Dedicated automated runtime pipeline loop
+
+// Lifecycle Triggers
+trigger name[time](ms)     // Fires continuously on elapsed interval
+trigger name[when](cond)   // Fires state condition loop matching criteria
+trigger name[once](cond)   // Single execution gatekeeper evaluation
+async { }                  // Async task framework blocks
+
+// Workspace Actions
+rest(ms)                   // Micro pause execution
+wait(ms)                   // Absolute thread hold wait states
+use "module.cor"           // Package engine import directive
+summon name                // Variable bubble hoisting extraction
+input("prompt")            // User terminal capture wrapper
+```
+
+---
+
+## Reference Sandbox Applications
+
+### App 1 — Task Manager
+```valence
+varL tasks = [
+  { id: 101, title: "  redesign website  ", priority: "high", done: false },
+  { id: 102, title: "build compiler", priority: "critical", done: true },
+  { id: 103, title: "record youtube video", priority: "medium", done: false }
+]
+
+print("=== VALENCE TASK MANAGER ===")
+
+circle i (tasks.len()) {
+  varL item = tasks[i]
+  item.title = item.title.trim().capitalize()
+
+  varL status_tag = ""
+  judge (item.done) {
+    true => status_tag = "[DONE]",
+    _    => status_tag = "[PENDING]"
+  }
+
+  print(status_tag + " " + item.title + " | Priority: " + item.priority.upper())
 }
 
-// varG doesn't need summon. Already everywhere.
-varG visible = 'always here'
-func[callable] easyAccess() {
-    print(visible)             // Works. No summon needed.
+print("Total Tasks: " + toString(tasks.len()))
+```
+
+### App 2 — Bank + Rewind Fraud Rollback
+```valence
+varL account = {
+  owner: "raian ghani",
+  balance: 2500,
+  tier: "gold"
 }
 
-## Data Types
+account.owner = account.owner.trim().capitalize()
 
-42                    // Integer
-3.14                  // Float
-'hello'               // String
-`he said 'wow'`       // Template string
-true                  // Boolean
-false                 // Boolean
-[1, 2, 3]            // Array
-{name: 'Knight'}     // Map
-| |                   // Null
+print("Account: " + account.owner)
+print("Start Balance: \$" + toString(account.balance))
 
-## Strings
+account.balance = account.balance - 500
+print("After -500: " + toString(account.balance))
 
-Single quotes. That's the Valence way.
-Need quotes inside? Use backticks.
+account.balance = account.balance - 1200
+print("After -1200: " + toString(account.balance))
 
-varL text = 'Failed Knight'
+print("--- FRAUD DETECTED: rewind(2) ---")
+rewind(2)
 
-text.len                        // 13
-text.upper                      // FAILED KNIGHT
-text.lower                      // failed knight
-text.trim                       // removes whitespace
-text.reverse                    // thginK deliaF
-text.repeat(2)                  // Failed KnightFailed Knight
-text.contains('Knight')         // true
-text.startsWith('Failed')       // true
-text.endsWith('Knight')         // true
-text.slice(0, 6)                // Failed
-text.charAt(0)                  // F
-text.replace('Failed', 'Epic')  // Epic Knight
-text.split(' ')                 // [Failed, Knight]
+print("Restored Balance: \$" + toString(account.balance))
 
-// Escape sequences
-print('Line 1\nLine 2')
-print('Tab\there')
-
-// Template strings
-varL msg = `He said 'Valence is fire'`
-
-## Arrays
-
-Square brackets. Simple.
-
-varL nums = [5, 3, 1, 4, 2]
-
-nums[0]                 // 5
-nums.len                // 5
-nums.first              // 5
-nums.last               // 2
-nums.isEmpty            // false
-nums.has(3)             // true
-nums.indexOf(4)         // 3
-nums.push(6)            // adds to end
-nums.pop()              // removes last
-nums.sort               // [1, 2, 3, 4, 5]
-nums.reverse            // [5, 4, 3, 2, 1]
-nums.join(' - ')        // 5 - 4 - 3 - 2 - 1
-nums.slice(1, 3)        // [4, 3]
-nums.clear              // []
-
-## Maps
-
-Key-value pairs. Like a dictionary but cooler.
-
-varL user = {name: 'Knight', age: 14, lang: 'Valence'}
-
-user.name               // Knight
-user.age                // 14
-user.size               // 3
-user.keys               // [name, age, lang]
-user.values             // [Knight, 14, Valence]
-user.has('name')        // true
-user.has('email')       // false
-user.get('lang')        // Valence
-user.delete('age')      // removes age
-
-## Math
-
-Valence follows PEMDAS automatically.
-No thinking required.
-
-10 + 5                  // 15
-10 - 3                  // 7
-4 * 3                   // 12
-20 / 4                  // 5
-10 % 3                  // 1
-2 ** 8                  // 256
-
-// PEMDAS just works
-2 + 3 * 4               // 14 (not 20)
-(2 + 3) * 4             // 20
-
-// Chain as much as you want
-1 + 2 + 3 + 4 + 5       // 15
-
-### Math Library
-
-math.sqrt(144)           // 12
-math.abs(-99)            // 99
-math.floor(3.9)          // 3
-math.ceil(3.1)           // 4
-math.round(3.5)          // 4
-math.random(1, 100)      // random number
-math.max(50, 100)        // 100
-math.min(50, 100)        // 50
-math.pow(2, 8)           // 256
-math.pi                  // 3.14159...
-math.e                   // 2.71828...
-math.sin(x)              // also cos, tan
-math.log(x)              // also log10
-
-## Conditions
-
-No if/else here. Valence uses check.
-
-check (x > 5) {
-    print('Big')
+varL risk = "safe"
+judge (risk) {
+  "safe" => print("Security: ALL CLEAR"),
+  "risk" => print("Security: LOCKED"),
+  _      => print("Security: UNKNOWN")
 }
-
-check (x == 10) {
-    print('Ten')
-} else {
-    print('Not ten')
-}
-
-// Chain with orCheck
-check (score >= 90) {
-    print('A')
-} orCheck (score >= 80) {
-    print('B')
-} orCheck (score >= 70) {
-    print('C')
-} else {
-    print('F')
-}
-
-### Logical Operators
-
-check (x > 5 and x < 10) {
-    print('Between 5 and 10')
-}
-
-check (x == 0 or x == 1) {
-    print('Binary')
-}
-
-check (not ready) {
-    print('Not ready yet')
-}
-
-### Comparisons
-
-a == b      // equal
-a != b      // not equal
-a > b       // greater
-a < b       // less
-a >= b      // greater or equal
-a <= b      // less or equal
-
-## Loops
-
-Valence uses circle. Because loops go around.
-The loop name becomes your counter. Clean.
-
-circle i(5) {
-    print(i)
-}
-// Output: 0 1 2 3 4
-
-// Name it whatever
-circle count(10) {
-    print(count)
-}
-
-// Break out with shatter
-circle i(100) {
-    check (i == 5) {
-        shatter
-    }
-    print(i)
-}
-// Output: 0 1 2 3 4
-
-// Skip with skip
-circle i(5) {
-    check (i == 2) {
-        skip
-    }
-    print(i)
-}
-// Output: 0 1 3 4
-
-// Nested loops
-circle x(3) {
-    circle y(3) {
-        print(toString(x) + ',' + toString(y))
-    }
-}
-
-## Functions
-
-Functions in Valence have types.
-Each type has its own behavior.
-
-// Callable - your standard function
-func[callable] add(a, b) {
-    reply a + b
-}
-print(add(5, 10))               // 15
-
-// No params? No problem.
-func[callable] greet() {
-    print('Hello!')
-}
-greet()
-
-// Recursion works
-func[callable] factorial(n) {
-    check (n <= 1) {
-        reply 1
-    }
-    reply n * factorial(n - 1)
-}
-print(factorial(10))             // 3628800
-
-// Onetime - runs once. Then it retires.
-func[onetime] init() {
-    print('Setup complete')
-}
-init()                           // Works
-init()                           // ERROR: already ran
-
-// Functions calling functions
-func[callable] square(n) {
-    reply n * n
-}
-func[callable] sumSquares(a, b) {
-    reply square(a) + square(b)
-}
-print(sumSquares(3, 4))          // 25
-
-## Type System
-
-type(42)                 // integer
-type(3.14)               // float
-type('hi')               // string
-type(true)               // boolean
-type([1, 2])             // array
-type({a: 1})             // map
-type(| |)                // null
-
-toInt('42')              // 42
-toFloat('3.14')          // 3.14
-toString(42)             // '42'
-toBool(1)                // true
-
-## File I/O
-
-Read. Write. Delete. Simple.
-
-file.write('data.txt', 'Hello World')
-varL content = file.read('data.txt')
-file.append('log.txt', 'New entry')
-file.exists('data.txt')          // true
-file.delete('data.txt')
-
-## Modules
-
-Import other .cor files.
-Or generate code and import it.
-
-use 'utils.cor'
-
-file.write('gen.cor', `func[callable] hi() { reply 'Generated!' }`)
-use 'gen.cor'
-print(hi())                      // Generated!
-
-## Input / Output
-
-print('Hello World')
-print(42)
-print([1, 2, 3])
-
-varL name = input('Name: ')
-print('Hello ' + name)
-
-## Timing
-
-rest(1000)               // Pause 1 second
-wait(500)                // Pause 0.5 seconds
-
-## Comments
-
-// Single line
-
-/* Multi-line
-   comment block */
-
-## CLI Commands
-
-cor run                  // Auto-find and run bridge.cor
-cor run file.cor         // Run specific file
-cor check file.cor       // Check syntax
-cor help                 // Show commands
-cor version              // Show version
-
-val init ProjectName     // Scaffold a new project
-val help                 // Show commands
-
-## Project Structure
-
-MyProject/
-    src/
-        bridge.cor       // Your code starts here
-    modules/             // Packages go here
-    data.toml            // Project config
-
-## Example: Number Guessing Game
-
-varG secret = math.random(1, 100)
-varG won = false
-
-circle attempt(10) {
-    check (won) { shatter }
-    varL guess = toInt(input('Guess 1-100: '))
-    check (guess == secret) {
-        print('You got it!')
-        update won = true
-    } orCheck (guess < secret) {
-        print('Higher!')
-    } else {
-        print('Lower!')
-    }
-}
-
-check (not won) {
-    print('Game over! It was ' + toString(secret))
-}
-
-## Example: Grade Calculator
-
-varL scores = [85, 92, 78, 95, 88]
-varL total = 0
-
-circle i(scores.len) {
-    update total = total + scores[i]
-}
-
-varL avg = total / scores.len
-
-check (avg >= 90) { print('A') }
-orCheck (avg >= 80) { print('B') }
-orCheck (avg >= 70) { print('C') }
-else { print('F') }
-
+```
 ## Built With
 
-Rust. From scratch.
-No frameworks. No hand-holding.
-Just mass research, mass errors, and mass dedication.
+Rust.
 
 ## License
 
