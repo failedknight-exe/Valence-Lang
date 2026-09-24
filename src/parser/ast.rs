@@ -1,6 +1,7 @@
 //! Abstract syntax tree nodes produced by the parser and consumed by the evaluator.
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Node {
     VarLDecl { name: String, value: Box<Node> },
     VarGDecl { name: String, value: Box<Node> },
@@ -88,5 +89,11 @@ pub enum Node {
     Weave {
         count: Box<Node>,
         body: Vec<Node>,
-    }
+    },
+
+    MeshCall {
+        mode: String,
+        method: String,
+        args: Vec<Node>,
+    },
 }

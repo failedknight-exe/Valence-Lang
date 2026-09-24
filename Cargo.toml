@@ -1,26 +1,18 @@
 [package]
 name = "valence"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
-authors = ["Failed Knight"]
-description = "Valence Language Runtime & Toolchain"
 
-# Library definition (exports lexer, parser, evaluator)
 [lib]
-name = "valence"
-path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
 
-# Binary 1: Maps src/bin/cor_main.rs to 'cor.exe'
 [[bin]]
 name = "cor"
 path = "src/bin/cor_main.rs"
 
-# Binary 2: Maps src/bin/val_main.rs to 'val.exe'
-[[bin]]
-name = "val"
-path = "src/bin/val_main.rs"
-
 [dependencies]
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"
+zstd = "0.13"
 chrono = "0.4"
-ureq = "2"
-memmap2 = "0.9"
+ureq = "2.9"

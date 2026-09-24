@@ -261,6 +261,37 @@ impl Parser {
     }
 
             Token::Ident(name) => {
+                if name == "mesh" && self.peek() == &Token::LBracket {
+                    self.advance(); // [
+                    let mode = match self.advance().clone() {
+                        Token::Ident(m) => m,
+                        _ => return None,
+                    };
+                    self.expect(&Token::RBracket);
+                    self.expect(&Token::Dot);
+                    let method = match self.advance().clone() {
+                        Token::Ident(m) => m,
+                        _ => return None,
+                    };
+                    let mut args = Vec::new();
+                    if self.peek() == &Token::LParen {
+                        self.advance();
+                        if self.peek() != &Token::RParen {
+                            args.push(self.parse_expression()?);
+                            while self.peek() == &Token::Comma {
+                                self.advance();
+                                args.push(self.parse_expression()?);
+                            }
+                        }
+                        self.expect(&Token::RParen);
+                    }
+                    return Some(Node::MeshCall {
+                        mode,
+                        method,
+                        args,
+                    });
+                }
+
                 if self.peek() == &Token::LParen {
                     self.advance();
                     let mut args = Vec::new();

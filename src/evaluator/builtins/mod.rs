@@ -15,6 +15,10 @@ pub mod paint;
 pub mod vbp;
 pub mod vault;
 pub mod weave;
+pub mod vbp_resolver;
+pub mod vbp_runner;
+pub mod vbp_pipe;
+pub mod mesh;
 
 use super::Evaluator;
 use super::value::Value;
@@ -22,6 +26,7 @@ use crate::parser::Node;
 
 impl Evaluator {
     pub fn eval_method_call(&mut self, object: String, method: String, args: Vec<Node>) -> Value {
+
     if self.constants.read().unwrap().contains_key(&object) {
         let muts = ["push", "pop", "reverse", "sort", "clear", "delete"];
         if muts.contains(&method.as_str()) {

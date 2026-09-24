@@ -47,6 +47,50 @@ impl Parser {
                     _ => unreachable!(),
                 };
 
+                            // mesh[bridge].host(8080)  /  mesh[bridge].send("hi")
+            if id_name == "mesh" && self.peek() == &Token::LBracket {
+                self.advance(); // [
+                let mode = match self.advance().clone() {
+                    Token::Ident(m) => m,
+                    other => {
+                        println!("[PARSE ERROR] Expected mesh mode ident, got {:?}", other);
+                        return None;
+                    }
+                };
+                if !self.expect(&Token::RBracket) {
+                    return None;
+                }
+                if !self.expect(&Token::Dot) {
+                    return None;
+                }
+                let method = match self.advance().clone() {
+                    Token::Ident(m) => m,
+                    other => {
+                        println!("[PARSE ERROR] Expected mesh method after '.', got {:?}", other);
+                        return None;
+                    }
+                };
+                let mut args = Vec::new();
+                if self.peek() == &Token::LParen {
+                    self.advance();
+                    if self.peek() != &Token::RParen {
+                        args.push(self.parse_expression()?);
+                        while self.peek() == &Token::Comma {
+                            self.advance();
+                            args.push(self.parse_expression()?);
+                        }
+                    }
+                    if !self.expect(&Token::RParen) {
+                        return None;
+                    }
+                }
+                return Some(Node::MeshCall {
+                    mode,
+                    method,
+                    args,
+                });
+            }
+
                 match self.peek() {
                     // Direct var update: x = 10
                     Token::Equals => {
@@ -315,26 +359,35 @@ impl Parser {
         Some(Node::Print(Box::new(value)))
     }
 
-    fn parse_circle(&mut self) -> Option<Node> {
-        self.advance();
-        let name = match self.advance().clone() {
-            Token::Ident(n) => n,
-            _ => "i".to_string(),
-        };
+        fn parse_circle(&mut self) -> Option<Node> {
+        self.advance(); // consume 'circle'
 
+        let mut name = "i".to_string();
+
+        // 1. If an identifier is provided (e.g. "circle step (5)" or "circle step forever")
+        if let Token::Ident(n) = self.peek() {
+            name = n.clone();
+            self.advance();
+        }
+
+        // 2. Determine count: either 'forever' (-1) or '(count_expr)'
         let count = if self.peek() == &Token::Forever {
             self.advance();
             Node::Integer(-1)
-        } else {
+        } else if self.peek() == &Token::LParen {
             self.expect(&Token::LParen);
             let c = self.parse_expression()?;
             self.expect(&Token::RParen);
             c
+        } else {
+            println!("[PARSE ERROR] Expected 'forever' or '(count)' after 'circle'");
+            return None;
         };
 
         self.expect(&Token::LBrace);
         let body = self.parse_block()?;
         self.expect(&Token::RBrace);
+
         Some(Node::Circle { name, count: Box::new(count), body })
     }
 

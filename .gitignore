@@ -1,6 +1,9 @@
 # Rust build output
 /target
 vbp.rs
+vbp_runner.rs
+vbp_resolver.rs
+vbp_pipe.rs
 
 # Debug symbols
 *.pdb

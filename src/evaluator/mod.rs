@@ -441,6 +441,9 @@ Node::StringLit(s) => {
             Node::VbpCall { method, args } => self.eval_vbp_builtin(&method, args),
             Node::VaultCall { method, args } => self.eval_vault_builtin(&method, args),
             Node::Weave { count, body } => self.eval_weave(*count, body),
+            Node::MeshCall { mode, method, args } => {
+                self.eval_mesh_builtin(&mode, &method, args)
+            }
         }
     }
 }
